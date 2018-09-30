@@ -157,7 +157,7 @@ def test_second_level_model_glm_computation():
         results1 = model.results_
 
         labels2, results2 = run_glm(
-            model.masker_.transform(Y), X.as_matrix(), 'ols')
+            model.masker_.transform(Y), X.values, 'ols')
         assert_almost_equal(labels1, labels2, decimal=1)
         assert_equal(len(results1), len(results2))
 
@@ -196,3 +196,8 @@ def test_second_level_model_contrast_computation():
         assert_raises(ValueError, model.compute_contrast, c1, None, '')
         assert_raises(ValueError, model.compute_contrast, c1, None, [])
         assert_raises(ValueError, model.compute_contrast, c1, None, None, '')
+        # check that passing no explicit contrast when the dsign
+        # matrix has morr than one columns raises an error
+        X = pd.DataFrame(np.random.rand(4, 2), columns=['r1', 'r2'])
+        model = model.fit(Y, design_matrix=X)
+        assert_raises(ValueError, model.compute_contrast, None)
