@@ -19,6 +19,7 @@ from sklearn.base import BaseEstimator, TransformerMixin, clone
 from nilearn._utils.niimg_conversions import check_niimg
 from nilearn._utils import CacheMixin
 from nilearn.input_data import NiftiMasker
+from nilearn.image import mean_img
 from patsy import DesignInfo
 
 from .first_level_model import FirstLevelModel
@@ -26,7 +27,7 @@ from .first_level_model import run_glm
 from .regression import SimpleRegressionResults
 from .contrasts import compute_contrast
 from .utils import _basestring
-from .design_matrix import create_second_level_design
+from .design_matrix import make_second_level_design_matrix
 
 
 def _infer_effect_maps(second_level_input, contrast_def):
@@ -209,6 +210,12 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
             if not isinstance(labels_dtype, np.object):
                 raise ValueError('subject_label column must be of dtype '
                                  'object instead of dtype %s' % labels_dtype)
+        elif isinstance(second_level_input, (str, Nifti1Image)):
+            if design_matrix is None:
+                raise ValueError('List of niimgs as second_level_input'
+                                 ' require a design matrix to be provided')
+            second_level_input = check_niimg(niimg=second_level_input,
+                                             ensure_ndim=4) 
         else:
             raise ValueError('second_level_input must be a list of'
                              ' `FirstLevelModel` objects, a pandas DataFrame'
@@ -262,6 +269,8 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
             sample_map = second_level_input['effects_map_path'][0]
             labels = second_level_input['subject_label']
             subjects_label = labels.values.tolist()
+        elif isinstance(second_level_input, Nifti1Image):
+            sample_map = mean_img(second_level_input)
         elif isinstance(second_level_input[0], FirstLevelModel):
             sample_model = second_level_input[0]
             sample_condition = sample_model.design_matrices_[0].columns[0]
@@ -271,12 +280,12 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
             subjects_label = labels
         else:
             # In this case design matrix had to be provided
-            sample_map = second_level_input[0]
+            sample_map = mean_img(second_level_input)
 
         # Create and set design matrix, if not given
         if design_matrix is None:
-            design_matrix = create_second_level_design(subjects_label,
-                                                       confounds)
+            design_matrix = make_second_level_design_matrix(subjects_label,
+                                                            confounds)
         self.design_matrix_ = design_matrix
 
         # Learn the mask. Assume the first level imgs have been masked.

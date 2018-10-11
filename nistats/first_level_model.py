@@ -31,10 +31,11 @@ from sklearn.externals.joblib import Parallel, delayed
 from patsy import DesignInfo
 
 from .regression import OLSModel, ARModel, SimpleRegressionResults
-from .design_matrix import make_design_matrix
+from .design_matrix import make_first_level_design_matrix
 from .contrasts import _fixed_effect_contrast
-from .utils import (_basestring, _check_run_tables, get_bids_files,
-                    parse_bids_filename)
+from .utils import (_basestring, _check_run_tables,
+                    _verify_events_file_uses_tab_separators,
+                    get_bids_files, parse_bids_filename)
 
 
 def mean_scaling(Y, axis=0):
@@ -161,10 +162,10 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         expressed as a percentage of the t_r (time repetition), so it can have
         values between 0. and 1.
 
-    hrf_model : string, optional
-        This parameter specifies the hemodynamic response function (HRF) for
-        the design matrices. It can be 'canonical', 'canonical with derivative'
-        or 'fir'.
+    hrf_model : {'spm', 'spm + derivative', 'spm + derivative + dispersion',
+        'glover', 'glover + derivative', 'glover + derivative + dispersion',
+        'fir', None}
+        String that specifies the hemodynamic response function. Defaults to 'glover'.
 
     drift_model : string, optional
         This parameter specifies the desired drift model for the design
@@ -316,7 +317,7 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         Parameters
         ----------
         run_imgs: Niimg-like object or list of Niimg-like objects,
-            See http://nilearn.github.io/building_blocks/manipulating_mr_images.html#niimg.
+            See http://nilearn.github.io/manipulating_images/input_output.html#inputing-data-file-names-or-image-objects
             Data on which the GLM will be fitted. If this is a list,
             the affine is considered the same for all.
 
@@ -341,6 +342,9 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         """
         # Check arguments
         # Check imgs type
+        if events is not None:
+            _verify_events_file_uses_tab_separators(
+                events_files=events)
         if not isinstance(run_imgs, (list, tuple)):
             run_imgs = [run_imgs]
         if design_matrices is None:
@@ -356,7 +360,6 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         # Also check that events and confound files can be loaded as DataFrame
         if events is not None:
             events = _check_run_tables(run_imgs, events, 'events')
-
         if confounds is not None:
             confounds = _check_run_tables(run_imgs, confounds, 'confounds')
 
@@ -431,11 +434,11 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
                 start_time = self.slice_time_ref * self.t_r
                 end_time = (n_scans - 1 + self.slice_time_ref) * self.t_r
                 frame_times = np.linspace(start_time, end_time, n_scans)
-                design = make_design_matrix(frame_times, events[run_idx],
-                                            self.hrf_model, self.drift_model,
-                                            self.period_cut, self.drift_order,
-                                            self.fir_delays, confounds_matrix,
-                                            confounds_names, self.min_onset)
+                design = make_first_level_design_matrix(frame_times, events[run_idx],
+                                                        self.hrf_model, self.drift_model,
+                                                        self.period_cut, self.drift_order,
+                                                        self.fir_delays, confounds_matrix,
+                                                        confounds_names, self.min_onset)
             else:
                 design = design_matrices[run_idx]
             self.design_matrices_.append(design)

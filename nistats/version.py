@@ -21,7 +21,7 @@ nistats version, required package versions, and utilities for checking
 # Dev branch marker is: 'X.Y.dev' or 'X.Y.devN' where N is an integer.
 # 'X.Y.dev0' is the canonical version of 'X.Y.dev'
 #
-__version__ = '0.0.1a'
+__version__ = '0.0.1b'
 
 _NISTATS_INSTALL_MSG = 'See %s for installation information.' % (
     'http://nistats.github.io/introduction.html#installation')
@@ -30,7 +30,7 @@ _NISTATS_INSTALL_MSG = 'See %s for installation information.' % (
 #   in some meaningful order (more => less 'core').
 REQUIRED_MODULE_METADATA = (
     ('numpy', {
-        'min_version': '1.11.2',
+        'min_version': '1.11',
         'install_info': _NISTATS_INSTALL_MSG}),
     ('scipy', {
         'min_version': '0.17',

@@ -13,7 +13,7 @@ from nibabel import load, Nifti1Image
 
 from nistats.first_level_model import (mean_scaling, run_glm, FirstLevelModel,
                                        first_level_models_from_bids)
-from nistats.design_matrix import check_design_matrix, make_design_matrix
+from nistats.design_matrix import check_design_matrix, make_first_level_design_matrix
 
 from nose.tools import assert_true, assert_equal, assert_raises
 from numpy.testing import (assert_almost_equal, assert_array_equal)
@@ -217,9 +217,11 @@ def test_fmri_inputs():
 def basic_paradigm():
     conditions = ['c0', 'c0', 'c0', 'c1', 'c1', 'c1', 'c2', 'c2', 'c2']
     onsets = [30, 70, 100, 10, 30, 90, 30, 40, 60]
-    paradigm = pd.DataFrame({'trial_type': conditions,
-                             'onset': onsets})
-    return paradigm
+    durations = 1 * np.ones(9)
+    events = pd.DataFrame({'trial_type': conditions,
+                             'onset': onsets,
+                             'duration': durations})
+    return events
 
 
 def test_first_level_model_design_creation():
@@ -230,20 +232,20 @@ def test_first_level_model_design_creation():
         FUNCFILE = FUNCFILE[0]
         func_img = load(FUNCFILE)
         # basic test based on basic_paradigm and glover hrf
-        t_r = 1.0
+        t_r = 10.0
         slice_time_ref = 0.
-        paradigm = basic_paradigm()
+        events = basic_paradigm()
         model = FirstLevelModel(t_r, slice_time_ref, mask=mask,
                                 drift_model='polynomial', drift_order=3)
-        model = model.fit(func_img, paradigm)
+        model = model.fit(func_img, events)
         frame1, X1, names1 = check_design_matrix(model.design_matrices_[0])
         # check design computation is identical
         n_scans = func_img.get_data().shape[3]
         start_time = slice_time_ref * t_r
         end_time = (n_scans - 1 + slice_time_ref) * t_r
         frame_times = np.linspace(start_time, end_time, n_scans)
-        design = make_design_matrix(frame_times, paradigm,
-                                    drift_model='polynomial', drift_order=3)
+        design = make_first_level_design_matrix(frame_times, events,
+                                                drift_model='polynomial', drift_order=3)
         frame2, X2, names2 = check_design_matrix(design)
         assert_array_equal(frame1, frame2)
         assert_array_equal(X1, X2)
@@ -257,14 +259,14 @@ def test_first_level_model_glm_computation():
         FUNCFILE = FUNCFILE[0]
         func_img = load(FUNCFILE)
         # basic test based on basic_paradigm and glover hrf
-        t_r = 1.0
+        t_r = 10.0
         slice_time_ref = 0.
-        paradigm = basic_paradigm()
+        events = basic_paradigm()
         # ols case
         model = FirstLevelModel(t_r, slice_time_ref, mask=mask,
                                 drift_model='polynomial', drift_order=3,
                                 minimize_memory=False)
-        model = model.fit(func_img, paradigm)
+        model = model.fit(func_img, events)
         labels1 = model.labels_[0]
         results1 = model.results_[0]
         labels2, results2 = run_glm(
@@ -282,9 +284,9 @@ def test_first_level_model_contrast_computation():
         FUNCFILE = FUNCFILE[0]
         func_img = load(FUNCFILE)
         # basic test based on basic_paradigm and glover hrf
-        t_r = 1.0
+        t_r = 10.0
         slice_time_ref = 0.
-        paradigm = basic_paradigm()
+        events = basic_paradigm()
         # ols case
         model = FirstLevelModel(t_r, slice_time_ref, mask=mask,
                                 drift_model='polynomial', drift_order=3,
@@ -293,7 +295,7 @@ def test_first_level_model_contrast_computation():
         # asking for contrast before model fit gives error
         assert_raises(ValueError, model.compute_contrast, c1)
         # fit model
-        model = model.fit([func_img, func_img], [paradigm, paradigm])
+        model = model.fit([func_img, func_img], [events, events])
         # smoke test for different contrasts in fixed effects
         model.compute_contrast([c1, c2])
         # smoke test for same contrast in fixed effects
