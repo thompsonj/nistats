@@ -87,10 +87,8 @@ from nistats.first_level_model import FirstLevelModel
 #
 # * t_r=7(s) is the time of repetition of acquisitions
 # * noise_model='ar1' specifies the noise covariance model: a lag-1 dependence
-# * standardize=False means that we do not want to rescale the time
-# series to mean 0, variance 1
-# * hrf_model='spm' means that we rely on the SPM "canonical hrf"
-# model (without time or dispersion derivatives)
+# * standardize=False means that we do not want to rescale the time series to mean 0, variance 1
+# * hrf_model='spm' means that we rely on the SPM "canonical hrf" model (without time or dispersion derivatives)
 # * drift_model='cosine' means that we model the signal drifts as slow oscillating time functions
 # * period_cut=160(s) defines the cutoff frequency (its inverse actually).
 fmri_glm = FirstLevelModel(t_r=7,
@@ -130,7 +128,7 @@ from os.path import join
 plot_design_matrix(design_matrix, output_file=join(outdir, 'design_matrix.png'))
 
 ###############################################################################
-# The first column contains the expected reponse profile of regions which are
+# The first column contains the expected response profile of regions which are
 # sensitive to the auditory stimulation.
 # Let's plot this first column
 
@@ -144,18 +142,18 @@ plt.show()
 # -----------------------------------------
 #
 # To access the estimated coefficients (Betas of the GLM model), we
-# created constrast with a single '1' in each of the columns: The role
+# created contrast with a single '1' in each of the columns: The role
 # of the contrast is to select some columns of the model --and
 # potentially weight them-- to study the associated statistics. So in
-# a nutshell, a contrast is a weigted combination of the estimated
+# a nutshell, a contrast is a weighted combination of the estimated
 # effects.  Here we can define canonical contrasts that just consider
 # the two condition in isolation ---let's call them "conditions"---
 # then a contrast that makes the difference between these conditions.
 
 from numpy import array
 conditions = {
-    'active': array([1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]),
-    'rest':   array([0., 1., 0., 0., 0., 0., 0., 0., 0., 0.]),
+    'active': array([1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]),
+    'rest':   array([0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]),
 }
 
 ###############################################################################
@@ -194,8 +192,8 @@ z_map = fmri_glm.compute_contrast(active_minus_rest,
 # We display it on top of the average
 # functional image of the series (could be the anatomical image of the
 # subject).  We use arbitrarily a threshold of 3.0 in z-scale. We'll
-# see later how to use corrected thresholds.  we show to display 3
-# axial views: display_mode='z', cut_coords=3
+# see later how to use corrected thresholds. We will show 3
+# axial views, with display_mode='z' and cut_coords=3
 
 plot_stat_map(z_map, bg_img=mean_img, threshold=3.0,
               display_mode='z', cut_coords=3, black_bg=True,
@@ -203,7 +201,7 @@ plot_stat_map(z_map, bg_img=mean_img, threshold=3.0,
 plt.show()
 
 ###############################################################################
-# Statistical signifiance testing. One should worry about the
+# Statistical significance testing. One should worry about the
 # statistical validity of the procedure: here we used an arbitrary
 # threshold of 3.0 but the threshold should provide some guarantees on
 # the risk of false detections (aka type-1 errors in statistics). One
@@ -222,8 +220,8 @@ plt.show()
 ###############################################################################
 # The problem is that with this you expect 0.001 * n_voxels to show up
 # while they're not active --- tens to hundreds of voxels. A more
-# conservative solution is to control the family wise errro rate,
-# i.e. the probability of making ony one false detection, say at
+# conservative solution is to control the family wise error rate,
+# i.e. the probability of making only one false detection, say at
 # 5%. For that we use the so-called Bonferroni correction
 
 _, threshold = map_threshold(z_map, level=.05, height_control='bonferroni')
@@ -234,10 +232,10 @@ plot_stat_map(z_map, bg_img=mean_img, threshold=threshold,
 plt.show()
 
 ###############################################################################
-# This is quite conservative indeed !  A popular alternative is to
-# control the false discovery rate, i.e. the expected proportion of
+# This is quite conservative indeed!  A popular alternative is to
+# control the expected proportion of
 # false discoveries among detections. This is called the false
-# disovery rate
+# discovery rate
 
 _, threshold = map_threshold(z_map, level=.05, height_control='fdr')
 print('False Discovery rate = 0.05 threshold: %.3f' % threshold)
@@ -250,7 +248,7 @@ plt.show()
 # Finally people like to discard isolated voxels (aka "small
 # clusters") from these images. It is possible to generate a
 # thresholded map with small clusters removed by providing a
-# cluster_threshold argument. here clusters smaller than 10 voxels
+# cluster_threshold argument. Here clusters smaller than 10 voxels
 # will be discarded.
 
 clean_map, threshold = map_threshold(
@@ -295,8 +293,8 @@ plot_contrast_matrix(effects_of_interest, design_matrix)
 plt.show()
 
 ###############################################################################
-# Specify the contrast and compute the correspoding map. Actually, the
-# contrast specification is done exactly the same way as for t
+# Specify the contrast and compute the corresponding map. Actually, the
+# contrast specification is done exactly the same way as for t-
 # contrasts.
 
 z_map = fmri_glm.compute_contrast(effects_of_interest,

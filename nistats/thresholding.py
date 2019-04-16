@@ -4,9 +4,10 @@ maps.
 Author: Bertrand Thirion, 2015
 """
 import numpy as np
+
+from nilearn.input_data import NiftiMasker
 from scipy.ndimage import label
 from scipy.stats import norm
-from nilearn.input_data import NiftiMasker
 
 
 def fdr_threshold(z_vals, alpha):
@@ -55,13 +56,13 @@ def map_threshold(stat_img=None, mask_img=None, level=.001,
     level: float, optional
         number controling the thresholding (either a p-value or z-scale value).
         Not to be confused with the z-scale threshold: level can be a p-values,
-        e.g. "0.05" or another type of number depending on the height_
-        control parameter. The z-scale threshold is actually returned by
+        e.g. "0.05" or another type of number depending on the
+        height_control parameter. The z-scale threshold is actually returned by
         the function.
 
     height_control: string, or None optional
         false positive control meaning of cluster forming
-        threshold: 'fpr'|'fdr'|'bonferroni'|None
+        threshold: 'fpr'|'fdr'|'bonferroni'\|None
 
     cluster_threshold : float, optional
         cluster size threshold. In the returned thresholded map,

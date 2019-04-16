@@ -8,19 +8,21 @@ first level contrasts or directly on fitted first level models
 Author: Martin Perez-Guevara, 2016
 """
 
-from warnings import warn
 import sys
 import time
+from warnings import warn
+
 import pandas as pd
 import numpy as np
-from nibabel import Nifti1Image
 
-from sklearn.base import BaseEstimator, TransformerMixin, clone
+from nibabel import Nifti1Image
 from nilearn._utils.niimg_conversions import check_niimg
 from nilearn._utils import CacheMixin
 from nilearn.input_data import NiftiMasker
 from nilearn.image import mean_img
 from patsy import DesignInfo
+from sklearn.base import BaseEstimator, TransformerMixin, clone
+from sklearn.externals.joblib import Memory
 
 from .first_level_model import FirstLevelModel
 from .first_level_model import run_glm
@@ -28,6 +30,7 @@ from .regression import SimpleRegressionResults
 from .contrasts import compute_contrast
 from .utils import _basestring
 from .design_matrix import make_second_level_design_matrix
+from nistats._utils.helpers import replace_parameters
 
 
 def _infer_effect_maps(second_level_input, contrast_def):
@@ -65,7 +68,7 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
     Parameters
     ----------
 
-    mask: Niimg-like, NiftiMasker or MultiNiftiMasker object, optional,
+    mask_img: Niimg-like, NiftiMasker or MultiNiftiMasker object, optional,
         Mask to be used on data. If an instance of masker is passed,
         then its mask will be used. If no mask is given,
         it will be computed automatically by a MultiNiftiMasker with default
@@ -100,12 +103,16 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         on memory consumption. True by default.
 
     """
-    def __init__(self, mask=None, smoothing_fwhm=None,
-                 memory=None, memory_level=1, verbose=0,
+    @replace_parameters({'mask': 'mask_img'}, end_version='next')
+    def __init__(self, mask_img=None, smoothing_fwhm=None,
+                 memory=Memory(None), memory_level=1, verbose=0,
                  n_jobs=1, minimize_memory=True):
-        self.mask = mask
+        self.mask_img = mask_img
         self.smoothing_fwhm = smoothing_fwhm
-        self.memory = memory
+        if isinstance(memory, _basestring):
+            self.memory = Memory(memory)
+        else:
+            self.memory = memory
         self.memory_level = memory_level
         self.verbose = verbose
         self.n_jobs = n_jobs
@@ -124,6 +131,7 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         ----------
         second_level_input: list of `FirstLevelModel` objects or pandas
                             DataFrame or list of Niimg-like objects.
+
             Giving FirstLevelModel objects will allow to easily compute
             the second level contast of arbitrary first level contrasts thanks
             to the first_level_contrast argument of the compute_contrast
@@ -156,6 +164,7 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
             from second_level_input.
             Ensure that the order of maps given by a second_level_input
             list of Niimgs matches the order of the rows in the design matrix.
+
         """
         # Check parameters
         # check first level input
@@ -289,13 +298,13 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         self.design_matrix_ = design_matrix
 
         # Learn the mask. Assume the first level imgs have been masked.
-        if not isinstance(self.mask, NiftiMasker):
+        if not isinstance(self.mask_img, NiftiMasker):
             self.masker_ = NiftiMasker(
-                mask_img=self.mask, smoothing_fwhm=self.smoothing_fwhm,
+                mask_img=self.mask_img, smoothing_fwhm=self.smoothing_fwhm,
                 memory=self.memory, verbose=max(0, self.verbose - 1),
                 memory_level=self.memory_level)
         else:
-            self.masker_ = clone(self.mask)
+            self.masker_ = clone(self.mask_img)
             for param_name in ['smoothing_fwhm', 'memory', 'memory_level']:
                 our_param = getattr(self, param_name)
                 if our_param is None:
@@ -325,7 +334,7 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
             The string can be a formula compatible with the linear constraint
             of the Patsy library. Basically one can use the name of the
             conditions as they appear in the design matrix of
-            the fitted model combined with operators /*+- and numbers.
+            the fitted model combined with operators /\*+- and numbers.
             Please check the patsy documentation for formula examples:
             http://patsy.readthedocs.io/en/latest/API-reference.html#patsy.DesignInfo.linear_constraint
             The default (None) is accepted if the design matrix has a single
@@ -335,6 +344,7 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
 
         first_level_contrast: str or array of shape (n_col) with respect to
                               FirstLevelModel, optional
+                              
             In case a list of FirstLevelModel was provided as
             second_level_input, we have to provide a contrast to apply to
             the first level models to get the corresponding list of images
@@ -396,18 +406,17 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         # Get effect_maps appropriate for chosen contrast
         effect_maps = _infer_effect_maps(self.second_level_input_,
                                          first_level_contrast)
-        # check design matrix X and effect maps Y agree on number of rows
+        # Check design matrix X and effect maps Y agree on number of rows
         if len(effect_maps) != self.design_matrix_.shape[0]:
             raise ValueError(
                 'design_matrix does not match the number of maps considered. '
                 '%i rows in design matrix do not match with %i maps' %
                 (self.design_matrix_.shape[0], len(effect_maps)))
 
-        # Fit an OLS regression for parametric statistics
+        # Fit an Ordinary Least Squares regression for parametric statistics
         Y = self.masker_.transform(effect_maps)
-        if self.memory is not None:
-            arg_ignore = ['n_jobs']
-            mem_glm = self.memory.cache(run_glm, ignore=arg_ignore)
+        if self.memory:
+            mem_glm = self.memory.cache(run_glm, ignore=['n_jobs'])
         else:
             mem_glm = run_glm
         labels, results = mem_glm(Y, self.design_matrix_.values,
@@ -420,7 +429,7 @@ class SecondLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         self.results_ = results
 
         # We compute contrast object
-        if self.memory is not None:
+        if self.memory:
             mem_contrast = self.memory.cache(compute_contrast)
         else:
             mem_contrast = compute_contrast

@@ -8,46 +8,41 @@ from __future__ import with_statement
 import os
 
 import numpy as np
-
-from nibabel import load, Nifti1Image
-
-from nistats.first_level_model import FirstLevelModel, run_glm
-from nistats.second_level_model import SecondLevelModel
-
-from nose.tools import assert_true, assert_equal, assert_raises
-from numpy.testing import (assert_almost_equal, assert_array_equal)
-from nibabel.tmpdirs import InTemporaryDirectory
 import pandas as pd
+import warnings
+
+from nibabel import (load,
+                     Nifti1Image,
+                     )
+from nibabel.tmpdirs import InTemporaryDirectory
 from nilearn.image import concat_imgs
+from nose.tools import (assert_true,
+                        assert_equal,
+                        assert_raises,
+                        )
+from numpy.testing import (assert_almost_equal,
+                           assert_array_equal,
+                           )
+
+from nistats.first_level_model import (FirstLevelModel,
+                                       run_glm,
+                                       )
+from nistats.second_level_model import SecondLevelModel
+from nistats._utils.testing import _write_fake_fmri_data
 
 # This directory path
 BASEDIR = os.path.dirname(os.path.abspath(__file__))
 FUNCFILE = os.path.join(BASEDIR, 'functional.nii.gz')
 
 
-def write_fake_fmri_data(shapes, rk=3, affine=np.eye(4)):
-    mask_file, fmri_files, design_files = 'mask.nii', [], []
-    for i, shape in enumerate(shapes):
-        fmri_files.append('fmri_run%d.nii' % i)
-        data = np.random.randn(*shape)
-        data[1:-1, 1:-1, 1:-1] += 100
-        Nifti1Image(data, affine).to_filename(fmri_files[-1])
-        design_files.append('dmtx_%d.csv' % i)
-        pd.DataFrame(np.random.randn(shape[3], rk),
-                     columns=['', '', '']).to_csv(design_files[-1])
-    Nifti1Image((np.random.rand(*shape[:3]) > .5).astype(np.int8),
-                affine).to_filename(mask_file)
-    return mask_file, fmri_files, design_files
-
-
 def test_high_level_glm_with_paths():
     with InTemporaryDirectory():
         shapes = ((7, 8, 9, 1),)
-        mask, FUNCFILE, _ = write_fake_fmri_data(shapes)
+        mask, FUNCFILE, _ = _write_fake_fmri_data(shapes)
         FUNCFILE = FUNCFILE[0]
         func_img = load(FUNCFILE)
-        # ols case
-        model = SecondLevelModel(mask=mask)
+        # Ordinary Least Squares case
+        model = SecondLevelModel(mask_img=mask)
         # asking for contrast before model fit gives error
         assert_raises(ValueError, model.compute_contrast, [])
         # fit model
@@ -59,8 +54,8 @@ def test_high_level_glm_with_paths():
         assert_true(isinstance(z_image, Nifti1Image))
         assert_array_equal(z_image.affine, load(mask).affine)
         # Delete objects attached to files to avoid WindowsError when deleting
-        # temporary directory
-        del z_image, FUNCFILE, func_img, model
+        # temporary directory (in Windows)
+        del Y, FUNCFILE, func_img, model
 
 
 def test_fmri_inputs():
@@ -70,7 +65,7 @@ def test_fmri_inputs():
         p, q = 80, 10
         X = np.random.randn(p, q)
         shapes = ((7, 8, 9, 10),)
-        mask, FUNCFILE, _ = write_fake_fmri_data(shapes)
+        mask, FUNCFILE, _ = _write_fake_fmri_data(shapes)
         FUNCFILE = FUNCFILE[0]
         func_img = load(FUNCFILE)
         T = func_img.shape[-1]
@@ -84,7 +79,7 @@ def test_fmri_inputs():
         flms = [flm, flm, flm]
         # prepare correct input dataframe and lists
         shapes = ((7, 8, 9, 1),)
-        _, FUNCFILE, _ = write_fake_fmri_data(shapes)
+        _, FUNCFILE, _ = _write_fake_fmri_data(shapes)
         FUNCFILE = FUNCFILE[0]
 
         dfcols = ['subject_label', 'map_name', 'effects_map_path']
@@ -99,7 +94,7 @@ def test_fmri_inputs():
 
         # smoke tests with correct input
         # First level models as input
-        SecondLevelModel(mask=mask).fit(flms)
+        SecondLevelModel(mask_img=mask).fit(flms)
         SecondLevelModel().fit(flms)
         # Note : the following one creates a singular design matrix
         SecondLevelModel().fit(flms, confounds)
@@ -147,11 +142,11 @@ def _first_level_dataframe():
 def test_second_level_model_glm_computation():
     with InTemporaryDirectory():
         shapes = ((7, 8, 9, 1),)
-        mask, FUNCFILE, _ = write_fake_fmri_data(shapes)
+        mask, FUNCFILE, _ = _write_fake_fmri_data(shapes)
         FUNCFILE = FUNCFILE[0]
         func_img = load(FUNCFILE)
-        # ols case
-        model = SecondLevelModel(mask=mask)
+        # Ordinary Least Squares case
+        model = SecondLevelModel(mask_img=mask)
         Y = [func_img] * 4
         X = pd.DataFrame([[1]] * 4, columns=['intercept'])
 
@@ -164,16 +159,20 @@ def test_second_level_model_glm_computation():
             model.masker_.transform(Y), X.values, 'ols')
         assert_almost_equal(labels1, labels2, decimal=1)
         assert_equal(len(results1), len(results2))
+        # Delete objects attached to files to avoid WindowsError when deleting
+        # temporary directory (in Windows)
+        del func_img, FUNCFILE, model, X, Y
+
 
 
 def test_second_level_model_contrast_computation():
     with InTemporaryDirectory():
         shapes = ((7, 8, 9, 1),)
-        mask, FUNCFILE, _ = write_fake_fmri_data(shapes)
+        mask, FUNCFILE, _ = _write_fake_fmri_data(shapes)
         FUNCFILE = FUNCFILE[0]
         func_img = load(FUNCFILE)
-        # ols case
-        model = SecondLevelModel(mask=mask)
+        # Ordinary Least Squares case
+        model = SecondLevelModel(mask_img=mask)
         # asking for contrast before model fit gives error
         assert_raises(ValueError, model.compute_contrast, 'intercept')
         # fit model
@@ -205,3 +204,66 @@ def test_second_level_model_contrast_computation():
         X = pd.DataFrame(np.random.rand(4, 2), columns=['r1', 'r2'])
         model = model.fit(Y, design_matrix=X)
         assert_raises(ValueError, model.compute_contrast, None)
+        # Delete objects attached to files to avoid WindowsError when deleting
+        # temporary directory (in Windows)
+        del func_img, FUNCFILE, model, X, Y
+
+        
+def test_second_level_model_contrast_computation_with_memory_caching():
+    with InTemporaryDirectory():
+        shapes = ((7, 8, 9, 1),)
+        mask, FUNCFILE, _ = _write_fake_fmri_data(shapes)
+        FUNCFILE = FUNCFILE[0]
+        func_img = load(FUNCFILE)
+        # Ordinary Least Squares case
+        model = SecondLevelModel(mask_img=mask, memory='nilearn_cache')
+        # fit model
+        Y = [func_img] * 4
+        X = pd.DataFrame([[1]] * 4, columns=['intercept'])
+        model = model.fit(Y, design_matrix=X)
+        ncol = len(model.design_matrix_.columns)
+        c1 = np.eye(ncol)[0, :]
+        # test memory caching for compute_contrast
+        model.compute_contrast(c1, output_type='z_score')
+        # or simply pass nothing
+        model.compute_contrast()
+        # Delete objects attached to files to avoid WindowsError when deleting
+        # temporary directory (in Windows)
+        del func_img, FUNCFILE, model, X, Y
+
+
+def test_param_mask_deprecation_SecondLevelModel():
+    """ Tests whether use of deprecated keyword parameter `mask`
+    raises the correct warning & transfers its value to
+    replacement parameter `mask_img` correctly.
+    """
+    deprecation_msg = (
+        'The parameter "mask" will be removed in next release of Nistats. '
+        'Please use the parameter "mask_img" instead.'
+    )
+    mask_filepath = '~/masks/mask_01.nii.gz'
+    with warnings.catch_warnings(record=True) as raised_warnings:
+        slm1 = SecondLevelModel(mask=mask_filepath)
+        slm2 = SecondLevelModel(mask_img=mask_filepath)
+        slm3 = SecondLevelModel(mask_filepath)
+    assert slm1.mask_img == mask_filepath
+    assert slm2.mask_img == mask_filepath
+    assert slm3.mask_img == mask_filepath
+    
+    with assert_raises(AttributeError):
+        slm1.mask == mask_filepath
+    with assert_raises(AttributeError):
+        slm2.mask == mask_filepath
+    with assert_raises(AttributeError):
+        slm3.mask == mask_filepath
+    
+    raised_param_deprecation_warnings = [
+        raised_warning_ for raised_warning_
+        in raised_warnings if
+        str(raised_warning_.message).startswith('The parameter')
+        ]
+    
+    assert len(raised_param_deprecation_warnings) == 1
+    for param_warning_ in raised_param_deprecation_warnings:
+        assert str(param_warning_.message) == deprecation_msg
+        assert param_warning_.category is DeprecationWarning

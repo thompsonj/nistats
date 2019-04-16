@@ -3,14 +3,17 @@
 Authors: Bertrand Thirion, Matthew Brett, 2015
 """
 import csv
-import sys
-import scipy.linalg as spl
-import numpy as np
-from scipy.stats import norm
-from warnings import warn
-import pandas as pd
-import os
 import glob
+import os
+import sys
+
+from warnings import warn
+
+import numpy as np
+import pandas as pd
+
+import scipy.linalg as spl
+from scipy.stats import norm
 
 py3 = sys.version_info[0] >= 3
 
@@ -66,7 +69,7 @@ def _check_and_load_tables(tables_, var_name):
     return tables
 
  
-def _verify_events_file_uses_tab_separators(events_files):
+def _check_events_file_uses_tab_separators(events_files):
     """
     Raises a ValueError if provided list of text based data files
     (.csv, .tsv, etc) do not enforce the BIDS convention of using Tabs
@@ -98,15 +101,24 @@ def _verify_events_file_uses_tab_separators(events_files):
         If value separators are not Tabs (or commas)
     """
     valid_separators = [',', '\t']
-    events_files = [events_files] if not isinstance(events_files, (list, tuple)) else events_files
+    if not isinstance(events_files, (list, tuple)):
+        events_files = [events_files]
     for events_file_ in events_files:
         try:
             with open(events_file_, 'r') as events_file_obj:
                 events_file_sample = events_file_obj.readline()
+            '''
+            The following errors are not being handled here,
+            as they are handled elsewhere in the calling code.
+            Handling them here will beak the calling code,
+            and refactoring that is not straighforward.
+            '''
         except TypeError as type_err:  # events is Pandas dataframe.
             pass
         except UnicodeDecodeError as unicode_err:  # py3:if binary file
-            pass
+            raise ValueError('The file does not seem to be '
+                             'a valid unicode text file.'
+                             )
         except IOError as io_err:  # if invalid filepath.
             pass
         else:
@@ -116,10 +128,12 @@ def _verify_events_file_uses_tab_separators(events_files):
                                     )
             except csv.Error:
                 raise ValueError(
-                    'The values in the events file are not separated by tabs; '
-                    'please enforce BIDS conventions',
-                    events_file_)
-    
+                        'The values in the events file '
+                        'are not separated by tabs; '
+                        'please enforce BIDS conventions',
+                        events_file_
+                        )
+            
 
 def _check_run_tables(run_imgs, tables_, tables_name):
     """Check fMRI runs and corresponding tables to raise error if necessary"""
@@ -394,13 +408,14 @@ def parse_bids_filename(img_path):
         'file_tag', 'file_type' and 'file_fields'.
 
         The 'file_tag' field refers to the last part of the file under the
-        BIDS convention that is of the form *_tag.type. Contrary to the rest
+        BIDS convention that is of the form \*_tag.type. Contrary to the rest
         of the file name it is not a key-value pair. This notion should be
         revised in the case we are handling derivatives since so far the
         convention will keep the tag prepended to any fields added in the
         case of preprocessed files that also end with another tag. This parser
         will consider any tag in the middle of the file name as a key with no
         value and will be included in the 'file_fields' key.
+
     """
     reference = {}
     reference['file_path'] = img_path

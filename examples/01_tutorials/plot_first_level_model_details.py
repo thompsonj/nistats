@@ -1,5 +1,5 @@
 """Studying first-level-model details in a trials-and-error fashion
-================================================================
+===================================================================
 
 In this tutorial, we study the parametrization of the first-level
 model used for fMRI data analysis and clarify their impact on the
@@ -10,7 +10,8 @@ new features in the analysis and look at the outcome, i.e. the
 resulting brain maps.
 
 Readers without prior experience in fMRI data analysis should first
-run the :ref:`plot_single_subject_single_run` tutorial to get a bit more
+run the `Analysis of a single session, single subject fMRI dataset`_
+tutorial to get a bit more
 familiar with the base concepts, and only then run this tutorial example.
 
 To run this example, you must launch IPython via ``ipython
@@ -19,6 +20,8 @@ To run this example, you must launch IPython via ``ipython
 .. contents:: **Contents**
     :local:
     :depth: 1
+
+.. _Analysis of a single session, single subject fMRI dataset: plot_single_subject_single_run.html
 
 """
 
@@ -145,7 +148,7 @@ contrasts = make_localizer_contrasts(design_matrix)
 plt.figure(figsize=(5, 9))
 from nistats.reporting import plot_contrast_matrix
 for i, (key, values) in enumerate(contrasts.items()):
-    ax = plt.subplot(5, 1, i + 1)
+    ax = plt.subplot(len(contrasts) + 1, 1, i + 1)
     plot_contrast_matrix(values, design_matrix=design_matrix, ax=ax)
 
 plt.show()
@@ -277,7 +280,10 @@ plt.show()
 # possibly valuable information This is implemented by an F test on
 # the time derivative regressors.
 
-contrast_val = np.eye(design_matrix.shape[1])[1:2:21]
+contrast_val = np.eye(design_matrix.shape[1])[1:21:2]
+plot_contrast_matrix(contrast_val, design_matrix)
+plt.show()
+
 z_map = first_level_model.compute_contrast(
     contrast_val, output_type='z_score')
 plotting.plot_stat_map(
@@ -285,8 +291,21 @@ plotting.plot_stat_map(
 plt.show()
 
 #########################################################################
-# We don't see too much here: the onset times and hrf delay we're
-# using are probably fine.
+# Well, there seems to be something here. Maybe we could adjust the
+# timing, by increasing the slice_time_ref parameter: 0 to 0.5 now the
+# reference for model sampling is not the beginning of the volume
+# acquisition, but the middle of it.
+first_level_model = FirstLevelModel(t_r, hrf_model='spm + derivative',
+                                    slice_time_ref=0.5)
+first_level_model = first_level_model.fit(fmri_img, events=events)
+z_map = first_level_model.compute_contrast(
+    contrast_val, output_type='z_score')
+plotting.plot_stat_map(
+    z_map, display_mode='z', threshold=3.0,
+    title='effect of time derivatives after model shift')
+plt.show()
+#########################################################################
+# The time derivatives regressors capture less signal: it's better so.
 
 #########################################################################
 # We can also consider adding the so-called dispersion derivative to
@@ -294,7 +313,8 @@ plt.show()
 #
 # This is done by specifying `hrf_model='spm + derivative + dispersion'`
 #
-first_level_model = FirstLevelModel(t_r, hrf_model='spm + derivative + dispersion')
+first_level_model = FirstLevelModel(t_r,slice_time_ref=0.5,
+                                    hrf_model='spm + derivative + dispersion')
 first_level_model = first_level_model.fit(fmri_img, events=events)
 design_matrix = first_level_model.design_matrices_[0]
 plot_design_matrix(design_matrix)
@@ -314,7 +334,9 @@ plt.show()
 # choice is to use an ordinaly least squares model (ols) that assumes
 # no temporal structure (time-independent noise)
 
-first_level_model = FirstLevelModel(t_r, hrf_model='spm + derivative', noise_model='ols')
+first_level_model = FirstLevelModel(t_r, slice_time_ref=0.5,
+                                    hrf_model='spm + derivative',
+                                    noise_model='ols')
 first_level_model = first_level_model.fit(fmri_img, events=events)
 design_matrix = first_level_model.design_matrices_[0]
 plot_design_matrix(design_matrix)
@@ -322,7 +344,8 @@ plot_contrast(first_level_model)
 plt.show()
 
 #########################################################################
-# While the difference is not obvious you should rather stick to the ar(1) model, which is arguably more accurate.
+# While the difference is not obvious you should rather stick to the
+# ar(1) model, which is arguably more accurate.
 
 #########################################################################
 # Removing confounds
@@ -337,14 +360,16 @@ plt.show()
 # is to estimate confounding effects from the data themselves, using
 # the compcorr approach, and take those into account in the model.
 #
-# For this we rely on the so-called :ref:`high_variance_confounds
-# <https://nilearn.github.io/modules/generated/nilearn.image.high_variance_confounds.html>`
+# For this we rely on the so-called `high_variance_confounds`_
 # routine of Nilearn.
+#
+# .. _high_variance_confounds: https://nilearn.github.io/modules/generated/nilearn.image.high_variance_confounds.html
 
 
 from nilearn.image import high_variance_confounds
 confounds = pd.DataFrame(high_variance_confounds(fmri_img, percentile=1))
-first_level_model = FirstLevelModel(t_r, hrf_model='spm + derivative')
+first_level_model = FirstLevelModel(t_r, hrf_model='spm + derivative',
+                                    slice_time_ref=0.5)
 first_level_model = first_level_model.fit(fmri_img, events=events,
                                           confounds=confounds)
 design_matrix = first_level_model.design_matrices_[0]
@@ -373,8 +398,8 @@ plt.show()
 # (fwhm).
 
 first_level_model = FirstLevelModel(
-    t_r, hrf_model='spm + derivative', smoothing_fwhm=5).fit(
-        fmri_img, events=events, confounds=confounds)
+    t_r, hrf_model='spm + derivative', smoothing_fwhm=5,
+    slice_time_ref=0.5).fit(fmri_img, events=events, confounds=confounds)
 design_matrix = first_level_model.design_matrices_[0]
 plot_design_matrix(design_matrix)
 plot_contrast(first_level_model)
@@ -387,7 +412,9 @@ plt.show()
 #########################################################################
 #  Masking
 # --------
-# Masking consists in selecting the region of the image on which the model is run: it is useless to run it outside of the brain.
+#
+# Masking consists in selecting the region of the image on which the
+# model is run: it is useless to run it outside of the brain.
 #
 # The approach taken by FirstLeveModel is to estimate it from the fMRI
 # data themselves when no mask is explicitly provided.  Since the data
@@ -398,10 +425,11 @@ plt.show()
 # downside is that the mask may not fit very well these particular
 # data.
 
-from nilearn.plotting import plot_roi 
+data_mask = first_level_model.masker_.mask_img_
 from nilearn.datasets import fetch_icbm152_brain_gm_mask
 icbm_mask = fetch_icbm152_brain_gm_mask()
-data_mask = first_level_model.masker_.mask_img_
+
+from nilearn.plotting import plot_roi 
 plt.figure(figsize=(16, 4))
 ax = plt.subplot(121)
 plot_roi(icbm_mask, title='ICBM mask', axes=ax)
@@ -410,17 +438,26 @@ plot_roi(data_mask, title='Data-driven mask', axes=ax)
 plt.show()
 
 #########################################################################
+# For the sake of time saving, we reample icbm_mask to our data
+# For this we call the resample_to_img routine of Nilearn.
+# We use interpolation = 'nearest' to keep the mask a binary image
+from nilearn.image import resample_to_img
+resampled_icbm_mask = resample_to_img(icbm_mask, data_mask,
+                                      interpolation='nearest')
+
+#########################################################################
 #  Impact on the first-level model
-
-
 first_level_model = FirstLevelModel(
-    t_r, hrf_model='spm + derivative', smoothing_fwhm=5).fit(
+    t_r, hrf_model='spm + derivative', smoothing_fwhm=5, slice_time_ref=0.5,
+    mask_img=resampled_icbm_mask).fit(
         fmri_img, events=events, confounds=confounds)
 design_matrix = first_level_model.design_matrices_[0]
 plot_design_matrix(design_matrix)
 plot_contrast(first_level_model)
 plt.show()
 
+#########################################################################
+# Note that it removed spurious spots in the white matter.
 
 #########################################################################
 # Conclusion

@@ -11,31 +11,43 @@ Author: Bertrand Thirion, Martin Perez-Guevara, 2016
 
 """
 
-from warnings import warn
-import time
-import sys
-import os
 import glob
 import json
+import os
+import sys
+import time
+from warnings import warn
 
 import numpy as np
 import pandas as pd
-from nibabel import Nifti1Image, AnalyzeImage
+from nibabel import Nifti1Image
 
-from sklearn.base import BaseEstimator, TransformerMixin, clone
+from sklearn.base import (BaseEstimator,
+                          clone,
+                          TransformerMixin,
+                          )
 from sklearn.externals.joblib import Memory
-from nilearn._utils.niimg_conversions import check_niimg
-from nilearn._utils import CacheMixin
 from nilearn.input_data import NiftiMasker
-from sklearn.externals.joblib import Parallel, delayed
+from nilearn._utils import CacheMixin
+from nilearn._utils.niimg_conversions import check_niimg
 from patsy import DesignInfo
+from sklearn.externals.joblib import (Parallel,
+                                      delayed,
+                                      )
 
-from .regression import OLSModel, ARModel, SimpleRegressionResults
-from .design_matrix import make_first_level_design_matrix
 from .contrasts import _fixed_effect_contrast
-from .utils import (_basestring, _check_run_tables,
-                    _verify_events_file_uses_tab_separators,
-                    get_bids_files, parse_bids_filename)
+from .design_matrix import make_first_level_design_matrix
+from .regression import (ARModel,
+                         OLSModel,
+                         SimpleRegressionResults,
+                         )
+from .utils import (_basestring,
+                    _check_run_tables,
+                    _check_events_file_uses_tab_separators,
+                    get_bids_files,
+                    parse_bids_filename,
+                    )
+from nistats._utils.helpers import replace_parameters
 
 
 def mean_scaling(Y, axis=0):
@@ -172,8 +184,8 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         matrices. It can be 'polynomial', 'cosine' or None.
 
     period_cut : float, optional
-        This parameter specifies the cut period of the low-pass filter in
-        seconds for the design matrices.
+        This parameter specifies the cut period of the high-pass filter in
+        seconds for the design matrices. Used only if drift_model is 'cosine'.
 
     drift_order : int, optional
         This parameter specifices the order of the drift model (in case it is
@@ -188,7 +200,7 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         (in seconds). Events that start before (slice_time_ref * t_r +
         min_onset) are not considered.
 
-    mask : Niimg-like, NiftiMasker object or False, optional
+    mask_img : Niimg-like, NiftiMasker object or False, optional
         Mask to be used on data. If an instance of masker is passed,
         then its mask will be used. If no mask is given,
         it will be computed automatically by a NiftiMasker with default
@@ -260,9 +272,10 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         values are RegressionResults instances corresponding to the voxels
 
     """
+    @replace_parameters({'mask': 'mask_img'}, end_version='next')
     def __init__(self, t_r=None, slice_time_ref=0., hrf_model='glover',
                  drift_model='cosine', period_cut=128, drift_order=1,
-                 fir_delays=[0], min_onset=-24, mask=None, target_affine=None,
+                 fir_delays=[0], min_onset=-24, mask_img=None, target_affine=None,
                  target_shape=None, smoothing_fwhm=None, memory=Memory(None),
                  memory_level=1, standardize=False, signal_scaling=0,
                  noise_model='ar1', verbose=0, n_jobs=1,
@@ -277,7 +290,7 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         self.fir_delays = fir_delays
         self.min_onset = min_onset
         # glm parameters
-        self.mask = mask
+        self.mask_img = mask_img
         self.target_affine = target_affine
         self.target_shape = target_shape
         self.smoothing_fwhm = smoothing_fwhm
@@ -322,13 +335,15 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
             the affine is considered the same for all.
 
         events: pandas Dataframe or string or list of pandas DataFrames or
-                   strings,
+                   strings
+                   
             fMRI events used to build design matrices. One events object
             expected per run_img. Ignored in case designs is not None.
             If string, then a path to a csv file is expected.
 
         confounds: pandas Dataframe or string or list of pandas DataFrames or
-                   strings,
+                   strings
+                   
             Each column in a DataFrame corresponds to a confound variable
             to be included in the regression model of the respective run_img.
             The number of rows must match the number of volumes in the
@@ -343,7 +358,7 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         # Check arguments
         # Check imgs type
         if events is not None:
-            _verify_events_file_uses_tab_separators(
+            _check_events_file_uses_tab_separators(
                 events_files=events)
         if not isinstance(run_imgs, (list, tuple)):
             run_imgs = [run_imgs]
@@ -364,14 +379,14 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
             confounds = _check_run_tables(run_imgs, confounds, 'confounds')
 
         # Learn the mask
-        if self.mask is False:
+        if self.mask_img is False:
             # We create a dummy mask to preserve functionality of api
             ref_img = check_niimg(run_imgs[0])
-            self.mask = Nifti1Image(np.ones(ref_img.shape[:3]),
-                                                ref_img.affine)
-        if not isinstance(self.mask, NiftiMasker):
+            self.mask_img = Nifti1Image(np.ones(ref_img.shape[:3]),
+                                        ref_img.affine)
+        if not isinstance(self.mask_img, NiftiMasker):
             self.masker_ = NiftiMasker(
-                mask_img=self.mask, smoothing_fwhm=self.smoothing_fwhm,
+                mask_img=self.mask_img, smoothing_fwhm=self.smoothing_fwhm,
                 target_affine=self.target_affine,
                 standardize=self.standardize, mask_strategy='epi',
                 t_r=self.t_r, memory=self.memory,
@@ -380,8 +395,8 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
                 memory_level=self.memory_level)
             self.masker_.fit(run_imgs[0])
         else:
-            if self.mask.mask_img_ is None and self.masker_ is None:
-                self.masker_ = clone(self.mask)
+            if self.mask_img.mask_img_ is None and self.masker_ is None:
+                self.masker_ = clone(self.mask_img)
                 for param_name in ['target_affine', 'target_shape',
                                    'smoothing_fwhm', 't_r', 'memory',
                                    'memory_level']:
@@ -394,7 +409,7 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
                     setattr(self.masker_, param_name, our_param)
                 self.masker_.fit(run_imgs[0])
             else:
-                self.masker_ = self.mask
+                self.masker_ = self.mask_img
 
         # For each run fit the model and keep only the regression results.
         self.labels_, self.results_, self.design_matrices_ = [], [], []
@@ -452,11 +467,11 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
 
             if self.verbose > 1:
                 t_masking = time.time() - t_masking
-                sys.stderr.write('Masker took %d seconds          \n' % t_masking)
+                sys.stderr.write('Masker took %d seconds       \n' % t_masking)
 
             if self.signal_scaling:
                 Y, _ = mean_scaling(Y, self.scaling_axis)
-            if self.memory is not None:
+            if self.memory:
                 mem_glm = self.memory.cache(run_glm, ignore=['n_jobs'])
             else:
                 mem_glm = run_glm
@@ -497,13 +512,14 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         ----------
         contrast_def : str or array of shape (n_col) or list of (string or
                        array of shape (n_col))
+                       
             where ``n_col`` is the number of columns of the design matrix,
             (one array per run). If only one array is provided when there
             are several runs, it will be assumed that the same contrast is
             desired for all runs. The string can be a formula compatible with
             the linear constraint of the Patsy library. Basically one can use
             the name of the conditions as they appear in the design matrix of
-            the fitted model combined with operators /*+- and numbers.
+            the fitted model combined with operators /\*+- and numbers.
             Please checks the patsy documentation for formula examples:
             http://patsy.readthedocs.io/en/latest/API-reference.html#patsy.DesignInfo.linear_constraint
 
@@ -512,12 +528,13 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
 
         output_type : str, optional
             Type of the output map. Can be 'z_score', 'stat', 'p_value',
-            'effect_size' or 'effect_variance'
+            'effect_size', 'effect_variance' or 'all'
 
         Returns
         -------
-        output : Nifti1Image
-            The desired output image
+        output : Nifti1Image or dict
+            The desired output image(s). If ``output_type == 'all'``, then
+            the output is a dictionary of images, keyed by the type of image.
 
         """
         if self.labels_ is None or self.results_ is None:
@@ -541,33 +558,37 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         if len(con_vals) != n_runs:
             warn('One contrast given, assuming it for all %d runs' % n_runs)
             con_vals = con_vals * n_runs
-        if isinstance(output_type, _basestring):
-            if output_type not in ['z_score', 'stat', 'p_value', 'effect_size',
-                                   'effect_variance']:
-                raise ValueError('output_type must be one of "z_score", "stat",'
-                                 ' "p_value","effect_size" or "effect_variance"')
-        else:
-            raise ValueError('output_type must be one of "z_score", "stat",'
-                             ' "p_value","effect_size" or "effect_variance"')
+
+        # 'all' is assumed to be the final entry; if adding more, place before 'all'
+        valid_types = ['z_score', 'stat', 'p_value', 'effect_size',
+                       'effect_variance', 'all']
+        if output_type not in valid_types:
+            raise ValueError('output_type must be one of {}'.format(valid_types))
 
         contrast = _fixed_effect_contrast(self.labels_, self.results_,
                                           con_vals, stat_type)
 
-        estimate_ = getattr(contrast, output_type)()
-        # Prepare the returned images
-        output = self.masker_.inverse_transform(estimate_)
-        contrast_name = str(con_vals)
-        output.header['descrip'] = (
-            '%s of contrast %s' % (output_type, contrast_name))
+        output_types = valid_types[:-1] if output_type == 'all' else [output_type]
 
-        return output
+        outputs = {}
+        for output_type_ in output_types:
+            estimate_ = getattr(contrast, output_type_)()
+            # Prepare the returned images
+            output = self.masker_.inverse_transform(estimate_)
+            contrast_name = str(con_vals)
+            output.header['descrip'] = (
+                '%s of contrast %s' % (output_type_, contrast_name))
+            outputs[output_type_] = output
+
+        return outputs if output_type == 'all' else output
 
 
+@replace_parameters({'mask': 'mask_img'}, end_version='next')
 def first_level_models_from_bids(
-        dataset_path, task_label, space_label, img_filters=[],
+        dataset_path, task_label, space_label, img_filters=None,
         t_r=None, slice_time_ref=0., hrf_model='glover', drift_model='cosine',
         period_cut=128, drift_order=1, fir_delays=[0], min_onset=-24,
-        mask=None, target_affine=None, target_shape=None, smoothing_fwhm=None,
+        mask_img=None, target_affine=None, target_shape=None, smoothing_fwhm=None,
         memory=Memory(None), memory_level=1, standardize=False,
         signal_scaling=0, noise_model='ar1', verbose=0, n_jobs=1,
         minimize_memory=True, derivatives_folder='derivatives'):
@@ -590,7 +611,7 @@ def first_level_models_from_bids(
         Specifies the space label of the preproc.nii images.
         As they are specified in the file names like _space-<space_label>_.
 
-    img_filters: list of tuples (str, str), optional (default: [])
+    img_filters: list of tuples (str, str), optional (default: None)
         Filters are of the form (field, label). Only one filter per field
         allowed. A file that does not match a filter will be discarded.
         Possible filters are 'acq', 'rec', 'run', 'res' and 'variant'.
@@ -622,6 +643,7 @@ def first_level_models_from_bids(
         Items for the FirstLevelModel fit function of their respective model.
     """
     # check arguments
+    img_filters = img_filters if img_filters else []
     if not isinstance(dataset_path, str):
         raise TypeError('dataset_path must be a string, instead %s was given' %
                         type(task_label))
@@ -712,7 +734,7 @@ def first_level_models_from_bids(
             t_r=t_r, slice_time_ref=slice_time_ref, hrf_model=hrf_model,
             drift_model=drift_model, period_cut=period_cut,
             drift_order=drift_order, fir_delays=fir_delays,
-            min_onset=min_onset, mask=mask, target_affine=target_affine,
+            min_onset=min_onset, mask_img=mask_img, target_affine=target_affine,
             target_shape=target_shape, smoothing_fwhm=smoothing_fwhm,
             memory=memory, memory_level=memory_level, standardize=standardize,
             signal_scaling=signal_scaling, noise_model=noise_model,

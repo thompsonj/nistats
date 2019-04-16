@@ -52,7 +52,7 @@ def _gamma_difference_hrf(tr, oversampling=50, time_length=32., onset=0.,
          hrf sampling on the oversampled time grid
     """
     dt = tr / oversampling
-    time_stamps = np.linspace(0, time_length, float(time_length) / dt)
+    time_stamps = np.linspace(0, time_length, np.rint(float(time_length) / dt).astype(np.int))
     time_stamps -= onset
     hrf = gamma.pdf(time_stamps, delay / dispersion, dt / dispersion) -\
         ratio * gamma.pdf(
@@ -265,7 +265,8 @@ def _sample_condition(exp_condition, frame_times, oversampling=50,
              min_onset) * oversampling) + 1
 
     hr_frame_times = np.linspace(frame_times.min() + min_onset,
-                                 frame_times.max() * (1 + 1. / (n - 1)), n_hr)
+                                 frame_times.max() * (1 + 1. / (n - 1)),
+                                 np.rint(n_hr).astype(np.int))
 
     # Get the condition information
     onsets, durations, values = tuple(map(np.asanyarray, exp_condition))
@@ -472,16 +473,17 @@ def compute_regressor(exp_condition, hrf_model, frame_times, con_id='cond',
     Notes
     -----
     The different hemodynamic models can be understood as follows:
-    'spm': this is the hrf model used in SPM
-    'spm + derivative': SPM model plus its time derivative (2 regressors)
-    'spm + time + dispersion': idem, plus dispersion derivative (3 regressors)
-    'glover': this one corresponds to the Glover hrf
-    'glover + derivative': the Glover hrf + time derivative (2 regressors)
-    'glover + derivative + dispersion': idem + dispersion derivative
+     - 'spm': this is the hrf model used in SPM
+     - 'spm + derivative': SPM model plus its time derivative (2 regressors)
+     - 'spm + time + dispersion': idem, plus dispersion derivative (3 regressors)
+     - 'glover': this one corresponds to the Glover hrf
+     - 'glover + derivative': the Glover hrf + time derivative (2 regressors)
+     - 'glover + derivative + dispersion': idem + dispersion derivative
                                         (3 regressors)
     'fir': finite impulse response basis, a set of delayed dirac models
            with arbitrary length. This one currently assumes regularly spaced
            frame times (i.e. fixed time of repetition).
+    
     It is expected that spm standard and Glover model would not yield
     large differences in most cases.
 

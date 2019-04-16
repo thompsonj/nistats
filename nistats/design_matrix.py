@@ -13,14 +13,15 @@ Design matrices contain three different types of regressors:
 1. Task-related regressors, that result from the convolution
    of the experimental paradigm regressors with hemodynamic models
    A hemodynamic model is one of:
-        'spm' : linear filter used in the SPM software
-        'glover' : linear filter estimated by G.Glover
-        'spm + derivative', 'glover + derivative': the same linear models,
+   
+         - 'spm' : linear filter used in the SPM software
+         - 'glover' : linear filter estimated by G.Glover
+         - 'spm + derivative', 'glover + derivative': the same linear models,
             plus their time derivative (2 regressors per condition)
-        'spm + derivative + dispersion', 'glover + derivative + dispersion':
+         - 'spm + derivative + dispersion', 'glover + derivative + dispersion':
             idem plus the derivative wrt the dispersion parameter of the hrf
             (3 regressors per condition)
-        'fir' : finite impulse response model, generic linear filter
+         - 'fir' : finite impulse response model, generic linear filter
 
 2. User-specified regressors, that represent information available on
    the data, e.g. motion parameters, physiological data resampled at
@@ -32,16 +33,19 @@ Design matrices contain three different types of regressors:
    estimates.
 
 Author: Bertrand Thirion, 2009-2015
+
 """
 from __future__ import with_statement
-from warnings import warn
-import sys
-import numpy as np
-from scipy import linalg
-import pandas as pd
 
-from .hemodynamic_models import compute_regressor, _orthogonalize
+import sys
+from warnings import warn
+
+import numpy as np
+import pandas as pd
+from scipy import linalg
+
 from .experimental_paradigm import check_events
+from .hemodynamic_models import compute_regressor, _orthogonalize
 from .utils import full_rank, _basestring
 
 ######################################################################
@@ -82,10 +86,10 @@ def _cosine_drift(period_cut, frame_times):
     Parameters
     ----------
     period_cut : float
-        Cut period of the low-pass filter (in sec)
+        Cut period of the high-pass filter in seconds
 
     frame_times : array of shape (n_scans,)
-        The sampling times (in sec)
+        The sampling times in seconds
 
     Returns
     -------
@@ -100,14 +104,14 @@ def _cosine_drift(period_cut, frame_times):
     dt = frame_times[1] - frame_times[0]
     order = int(np.floor(2 * n_frames * hfcut * dt))
     # s.t. hfcut = 1 / (2 * dt) yields n_frames
-    cosine_drift = np.zeros((n_frames, order))
+    cosine_drift = np.zeros((n_frames, order + 1))
     normalizer = np.sqrt(2.0 / n_frames)
 
-    for k in range(1, order):
+    for k in range(1, order + 1):
         cosine_drift[:, k - 1] = normalizer * np.cos(
             (np.pi / n_frames) * (n_times + .5) * k)
 
-    cosine_drift[:, order - 1] = 1.
+    cosine_drift[:, -1] = 1.
     return cosine_drift
 
 
@@ -291,7 +295,7 @@ def make_first_level_design_matrix(
 
     events : DataFrame instance, optional
         Events data that describes the experimental paradigm.
-        The DataFrame instance might have these keys:
+         The DataFrame instance might have these keys:
             'onset': column to specify the start time of each events in
                      seconds. An error is raised if this key is missing.
             'trial_type': column to specify per-event experimental conditions
@@ -303,6 +307,7 @@ def make_first_level_design_matrix(
             'modulation': column to specify the amplitude of each
                           events. If missing the default is set to
                           ones(n_events).
+        
         An experimental paradigm is valid if it has an 'onset' key
         and a 'duration' key.
         If these keys are missing an error will be raised.
@@ -319,7 +324,8 @@ def make_first_level_design_matrix(
         Specifies the desired drift model,
 
     period_cut : float, optional
-        Cut period of the low-pass filter in seconds.
+        Cut period of the high-pass filter in seconds.
+        Used only if drift_model is 'cosine'.
 
     drift_order : int, optional
         Order of the drift model (in case it is polynomial).

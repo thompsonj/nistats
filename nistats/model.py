@@ -7,10 +7,10 @@ Author: Bertrand Thirion, 2011--2015
 """
 
 import numpy as np
-from scipy.linalg import inv
-from scipy.stats import t as t_distribution
 
 from nibabel.onetime import setattr_on_read
+from scipy.linalg import inv
+from scipy.stats import t as t_distribution
 
 from .utils import positive_reciprocal
 
@@ -300,10 +300,12 @@ class LikelihoodModelResults(object):
 
         Notes
         -----
+        
         Confidence intervals are two-tailed.
-        TODO:
+        
         tails : string, optional
-            `tails` can be "two", "upper", or "lower"
+            Possible values: 'two' | 'upper' | 'lower'
+
         '''
         if cols is None:
             lower = self.theta - inv_t_cdf(1 - alpha / 2, self.df_resid) *\

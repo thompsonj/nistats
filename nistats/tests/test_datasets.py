@@ -1,19 +1,18 @@
-import os
 import json
-from tempfile import NamedTemporaryFile
-import zipfile
+import os
 
-import nibabel
-from nilearn._utils.testing import (mock_request, wrap_chunk_read_,
-                                    FetchFilesMock, assert_raises_regex)
+import numpy as np
+import pandas as pd
+
+from nibabel.tmpdirs import InTemporaryDirectory
+from nilearn._utils.compat import _basestring
 from nilearn.datasets.tests import test_utils as tst
 from nilearn.datasets import utils, func
 from nilearn.datasets.utils import _get_dataset_dir
-from nilearn._utils.compat import _basestring
 from nose import with_setup
-from nose.tools import assert_true, assert_false, assert_equal, assert_raises
-import numpy as np
-import pandas as pd
+from nose.tools import (assert_equal,
+                        assert_true,
+                        )
 
 from nistats import datasets
 
@@ -150,49 +149,63 @@ def test_fetch_openneuro_dataset():
     assert_true(len(dl_files) == 9)
 
 
-def test_make_events_file_localizer_first_level():
-    def _input_data_for_test_file():
-        file_data = [
-            [0, 'calculvideo', 0.0],
-            [0, 'calculvideo', 2.400000095],
-            [0, 'damier_H', 8.699999809],
-            [0, 'clicDaudio', 11.39999961],
-            ]
-        return pd.DataFrame(file_data)
-    
-    def _expected_output_data_from_test_file():
-        file_data = [
-            ['calculvideo', 0.0, 1.0],
-            ['calculvideo', 2.400000095, 1.0],
-            ['damier_H', 8.699999809, 1.0],
-            ['clicDaudio', 11.39999961, 1.0],
-            ]
-        file_data = pd.DataFrame(file_data)
-        file_data.columns = ['trial_type', 'onset', 'duration']
-        return file_data
-    
-    def run_test():
-        data_for_tests = _input_data_for_test_file()
-        expected_data_from_test_file = _expected_output_data_from_test_file()
-        with NamedTemporaryFile(mode='w',
-                                dir=os.getcwd(),
-                                suffix='.csv') as temp_csv_obj:
-            data_for_tests.to_csv(temp_csv_obj.name,
-                                  index=False,
-                                  header=False,
-                                  sep=' ',
-                                  )
-            datasets._make_events_file_localizer_first_level(
-                    temp_csv_obj.name
-                    )
-            data_from_test_file_post_mod = pd.read_csv(temp_csv_obj.name,
-                                                       sep='\t')
-            assert_true(all(
-                    expected_data_from_test_file == data_from_test_file_post_mod
-                    )
-                    )
-    
-    run_test()
+def _mock_original_localizer_first_level_events_file():
+    file_data = [
+        [0, 'calculvideo', 0.0],
+        [0, 'calculvideo', 2.400000095],
+        [0, 'damier_H', 8.699999809],
+        [0, 'clicDaudio', 11.39999961],
+        ]
+    return pd.DataFrame(file_data)
+
+
+def _mock_bids_compliant_localizer_first_level_events_file():
+    file_data = [
+        ['calculvideo', 0.0, 1.0],
+        ['calculvideo', 2.400000095, 1.0],
+        ['damier_H', 8.699999809, 1.0],
+        ['clicDaudio', 11.39999961, 1.0],
+        ]
+    file_data = pd.DataFrame(file_data)
+    file_data.columns = ['trial_type', 'onset', 'duration']
+    return file_data
+
+
+def test_make_events_file_localizer_first_level_with_file_handle():
+    data_for_tests = _mock_original_localizer_first_level_events_file()
+    expected_data_from_test_file = _mock_bids_compliant_localizer_first_level_events_file()
+    temp_tsv_file = 'temp_file.tsv'
+    with InTemporaryDirectory():
+        data_for_tests.to_csv(temp_tsv_file,
+                              index=False,
+                              header=False,
+                              sep=' ',
+                              )
+        datasets._make_events_file_localizer_first_level(temp_tsv_file)
+        data_from_test_file_post_mod = pd.read_csv(temp_tsv_file,
+                                                   sep='\t')
+        assert_true(all(
+                expected_data_from_test_file == data_from_test_file_post_mod
+                )
+                )
+
+
+def test_make_events_file_localizer_first_level_with_file_path():
+    data_for_tests = _mock_original_localizer_first_level_events_file()
+    expected_data_from_test_file = _mock_bids_compliant_localizer_first_level_events_file()
+    with InTemporaryDirectory():
+        temp_tsv_file = 'tempfile.tsv'
+        data_for_tests.to_csv(temp_tsv_file,
+                              index=False,
+                              header=False,
+                              sep=' ',
+                              )
+        datasets._make_events_file_localizer_first_level(temp_tsv_file)
+        data_from_test_file_post_mod = pd.read_csv(temp_tsv_file, sep='\t')
+        assert_true(all(
+                expected_data_from_test_file == data_from_test_file_post_mod
+                )
+                )
 
 
 @with_setup(setup_mock, teardown_mock)
@@ -202,38 +215,44 @@ def test_fetch_localizer():
     assert_true(isinstance(dataset.epi_img, _basestring))
 
 
+def _mock_original_spm_auditory_events_file():
+    expected_events_data = {
+        'onset': [factor * 42.0 for factor in range(0, 16)],
+        'duration': [42.0] * 16,
+        'trial_type': ['rest', 'active'] * 8,
+        }
+    expected_events_data = pd.DataFrame(expected_events_data)
+    expected_events_data_string = expected_events_data.to_csv(
+            sep='\t',
+            index=0,
+            columns=['onset', 'duration', 'trial_type'],
+            )
+    return expected_events_data_string
+
+
+def _mock_bids_compliant_spm_auditory_events_file():
+    events_filepath = os.path.join(os.getcwd(), 'tests_events.tsv')
+    datasets._make_events_file_spm_auditory_data(
+        events_filepath=events_filepath)
+    with open(events_filepath, 'r') as actual_events_file_obj:
+        actual_events_data_string = actual_events_file_obj.read()
+    return actual_events_data_string, events_filepath
+
+
 def test_make_spm_auditory_events_file():
-    def create_expected_data():
-        expected_events_data = {
-            'onset': [factor * 42.0 for factor in range(0, 16)],
-            'duration': [42.0] * 16,
-            'trial_type': ['rest', 'active'] * 8,
-            }
-        expected_events_data = pd.DataFrame(expected_events_data)
-        expected_events_data_string = expected_events_data.to_csv(
-                sep='\t',
-                index=0,
-                columns=['onset', 'duration', 'trial_type'],
-                )
-        return expected_events_data_string
+    try:
+        actual_events_data_string, events_filepath = _mock_bids_compliant_spm_auditory_events_file()
+    finally:
+        os.remove(events_filepath)
+    expected_events_data_string = _mock_original_spm_auditory_events_file()
     
-    def create_actual_data():
-        events_filepath = os.path.join(os.getcwd(), 'tests_events.tsv')
-        datasets._make_events_file_spm_auditory_data(
-            events_filepath=events_filepath)
-        with open(events_filepath, 'r') as actual_events_file_obj:
-            actual_events_data_string = actual_events_file_obj.read()
-        return actual_events_data_string, events_filepath
+    replace_win_line_ends = (lambda text: text.replace('\r\n', '\n')
+                                if text.find('\r\n') != -1 else text
+                             )
+    actual_events_data_string = replace_win_line_ends(actual_events_data_string)
+    expected_events_data_string = replace_win_line_ends(expected_events_data_string)
     
-    def run_test():
-        try:
-            actual_events_data_string, events_filepath = create_actual_data()
-        finally:
-            os.remove(events_filepath)
-        expected_events_data_string = create_expected_data()
-        assert_equal(actual_events_data_string, expected_events_data_string)
-    
-    run_test()
+    assert_equal(actual_events_data_string, expected_events_data_string)
 
 
 @with_setup(setup_mock, teardown_mock)
