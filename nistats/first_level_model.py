@@ -585,7 +585,7 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
 
 @replace_parameters({'mask': 'mask_img'}, end_version='next')
 def first_level_models_from_bids(
-        dataset_path, task_label, space_label, img_filters=None,
+        dataset_path, task_label, space_label=None, img_filters=None,
         t_r=None, slice_time_ref=0., hrf_model='glover', drift_model='cosine',
         period_cut=128, drift_order=1, fir_delays=[0], min_onset=-24,
         mask_img=None, target_affine=None, target_shape=None, smoothing_fwhm=None,
@@ -652,7 +652,7 @@ def first_level_models_from_bids(
     if not isinstance(task_label, str):
         raise TypeError('task_label must be a string, instead %s was given' %
                         type(task_label))
-    if not isinstance(space_label, str):
+    if space_label is not None and not isinstance(space_label, str):
         raise TypeError('space_label must be a string, instead %s was given' %
                         type(space_label))
     if not isinstance(img_filters, list):
@@ -743,7 +743,10 @@ def first_level_models_from_bids(
         models.append(model)
 
         # Get preprocessed imgs
-        filters = [('task', task_label), ('space', space_label)] + img_filters
+        if space_label is None:
+            filters = [('task', task_label)] + img_filters
+        else:
+            filters = [('task', task_label), ('space', space_label)] + img_filters
         imgs = get_bids_files(derivatives_path, modality_folder='func',
                               file_tag='preproc', file_type='nii*',
                               sub_label=sub_label, filters=filters)

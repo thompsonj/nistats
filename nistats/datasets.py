@@ -68,7 +68,7 @@ def fetch_langloc_dataset(data_dir=None, verbose=1):
     """
     url = 'https://osf.io/npgey/download'
     dataset_name = 'langloc_example'
-    main_folder = 'langloc_dataset'
+    main_folder = 'fMRI-language-localizer-dataset/'
     data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
                                 verbose=verbose)
     # The files_spec needed for _fetch_files

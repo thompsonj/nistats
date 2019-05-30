@@ -34,7 +34,7 @@ def _read_events_table(table):
     ----------
     table: string
         Accepts the path to an events file
-    
+
     Returns
     -------
     loaded: pandas.Dataframe object
@@ -47,7 +47,7 @@ def _read_events_table(table):
         raise ValueError('table path %s could not be loaded' % table)
     if loaded.empty:
         try:
-            loaded = pd.read_table(table)
+            loaded = pd.read_csv(table, sep='\t')
         except:
             raise ValueError('table path %s could not be loaded' % table)
     return loaded
@@ -68,13 +68,13 @@ def _check_and_load_tables(tables_, var_name):
                             (var_name, type(table), table_idx))
     return tables
 
- 
+
 def _check_events_file_uses_tab_separators(events_files):
     """
     Raises a ValueError if provided list of text based data files
     (.csv, .tsv, etc) do not enforce the BIDS convention of using Tabs
     as separators.
-    
+
     Only scans their first row.
     Does nothing if:
         If the separator used is BIDS compliant.
@@ -83,18 +83,18 @@ def _check_events_file_uses_tab_separators(events_files):
 
     Does not flag comma-separated-values-files for compatibility reasons;
     this may change in future as commas are not BIDS compliant.
-    
+
     parameters
     ----------
     events_files: str, List/Tuple[str]
         A single file's path or a collection of filepaths.
         Files are expected to be text files.
         Non-text files will raise ValueError.
-    
+
     Returns
     -------
     None
-    
+
     Raises
     ------
     ValueError:
@@ -133,7 +133,7 @@ def _check_events_file_uses_tab_separators(events_files):
                         'please enforce BIDS conventions',
                         events_file_
                         )
-            
+
 
 def _check_run_tables(run_imgs, tables_, tables_name):
     """Check fMRI runs and corresponding tables to raise error if necessary"""
