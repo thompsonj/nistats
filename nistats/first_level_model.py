@@ -339,14 +339,14 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
 
         events: pandas Dataframe or string or list of pandas DataFrames or
                    strings
-                   
+
             fMRI events used to build design matrices. One events object
             expected per run_img. Ignored in case designs is not None.
             If string, then a path to a csv file is expected.
 
         confounds: pandas Dataframe or string or list of pandas DataFrames or
                    strings
-                   
+
             Each column in a DataFrame corresponds to a confound variable
             to be included in the regression model of the respective run_img.
             The number of rows must match the number of volumes in the
@@ -515,7 +515,7 @@ class FirstLevelModel(BaseEstimator, TransformerMixin, CacheMixin):
         ----------
         contrast_def : str or array of shape (n_col) or list of (string or
                        array of shape (n_col))
-                       
+
             where ``n_col`` is the number of columns of the design matrix,
             (one array per run). If only one array is provided when there
             are several runs, it will be assumed that the same contrast is
@@ -617,9 +617,9 @@ def first_level_models_from_bids(
     img_filters: list of tuples (str, str), optional (default: None)
         Filters are of the form (field, label). Only one filter per field
         allowed. A file that does not match a filter will be discarded.
-        Possible filters are 'acq', 'rec', 'run', 'res' and 'variant'.
-        Filter examples would be (variant, smooth), (acq, pa) and
-        (res, 1x1x1).
+        Possible filters are 'acq', 'ce', 'dir', 'rec', 'run', 'echo', and
+        'desc'. Filter examples would be ('desc', 'preproc'), ('dir', 'pa') and
+        ('run', '10').
 
     derivatives_folder: str, optional
         derivatives and app folder path containing preprocessed files.
@@ -666,10 +666,10 @@ def first_level_models_from_bids(
                 not isinstance(img_filter[1], str)):
             raise TypeError('filters in img filters must be (str, str), '
                             'instead %s was given' % type(img_filter))
-        if img_filter[0] not in ['acq', 'rec', 'run', 'res', 'variant']:
+        if img_filter[0] not in ['acq', 'ce', 'dir', 'rec', 'run', 'echo', 'desc']:
             raise ValueError("field %s is not a possible filter. Only "
-                             "'acq', 'rec', 'run', 'res' and 'variant' "
-                             "are allowed." % type(img_filter[0]))
+                             "'acq', 'ce', 'dir', 'rec', 'run', 'echo', 'desc' "
+                             "are allowed." % img_filter[0])
 
     # check derivatives folder is present
     derivatives_path = os.path.join(dataset_path, derivatives_folder)
@@ -689,7 +689,7 @@ def first_level_models_from_bids(
                 filters.append(img_filter)
 
         img_specs = get_bids_files(derivatives_path, modality_folder='func',
-                                   file_tag='preproc', file_type='json',
+                                   file_tag='bold', file_type='json',
                                    filters=filters)
         # If we dont find the parameter information in the derivatives folder
         # we try to search in the raw data folder
@@ -748,7 +748,7 @@ def first_level_models_from_bids(
         # Get preprocessed imgs
         filters = [('task', task_label), ('space', space_label)] + img_filters
         imgs = get_bids_files(derivatives_path, modality_folder='func',
-                              file_tag='preproc', file_type='nii*',
+                              file_tag='bold', file_type='nii*',
                               sub_label=sub_label, filters=filters)
         # If there is more than one file for the same (ses, run), likely we
         # have an issue of underspecification of filters.
@@ -764,7 +764,7 @@ def first_level_models_from_bids(
                         raise ValueError(
                             'More than one nifti image found for the same run '
                             '%s and session %s. Please verify that the '
-                            'preproc_variant and space_label labels '
+                            'desc_label and space_label labels '
                             'corresponding to the BIDS spec '
                             'were correctly specified.' %
                             (img_dict['run'], img_dict['ses']))
@@ -777,7 +777,7 @@ def first_level_models_from_bids(
                         raise ValueError(
                             'More than one nifti image found for the same ses '
                             '%s, while no additional run specification present'
-                            '. Please verify that the preproc_variant and '
+                            '. Please verify that the desc_label and '
                             'space_label labels '
                             'corresponding to the BIDS spec '
                             'were correctly specified.' %
@@ -789,7 +789,7 @@ def first_level_models_from_bids(
                     if img_dict['run'] in run_check_list:
                         raise ValueError(
                             'More than one nifti image found for the same run '
-                            '%s. Please verify that the preproc_variant and '
+                            '%s. Please verify that the desc_label and '
                             'space_label labels '
                             'corresponding to the BIDS spec '
                             'were correctly specified.' %
@@ -823,7 +823,7 @@ def first_level_models_from_bids(
         # Get confounds. If not found it will be assumed there are none.
         # If there are confounds, they are assumed to be present for all runs.
         confounds = get_bids_files(derivatives_path, modality_folder='func',
-                                   file_tag='confounds', file_type='tsv',
+                                   file_tag='desc-confounds_regressors', file_type='tsv',
                                    sub_label=sub_label, filters=filters)
 
         if confounds:
