@@ -611,7 +611,7 @@ def first_level_models_from_bids(
         Task_label as specified in the file names like _task-<task_label>_.
 
     space_label: str, optional
-        Specifies the space label of the preproc.nii images.
+        Specifies the space label of the preprocessed bold.nii images.
         As they are specified in the file names like _space-<space_label>_.
 
     img_filters: list of tuples (str, str), optional (default: None)
@@ -698,7 +698,7 @@ def first_level_models_from_bids(
                                        file_tag='bold', file_type='json',
                                        filters=filters)
         if not img_specs:
-            warn('No preproc.json found in derivatives folder and no bold.json'
+            warn('No bold.json found in derivatives folder or'
                  ' in dataset folder. t_r can not be inferred and will need to'
                  ' be set manually in the list of models, otherwise their fit '
                  'will throw an exception')
