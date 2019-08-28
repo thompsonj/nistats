@@ -46,7 +46,7 @@ def _check_import_boto3(module_name):
 
 
 
-def fetch_langloc_dataset(data_dir=None, verbose=1):
+def fetch_language_localizer_demo_dataset(data_dir=None, verbose=1):
     """Download language localizer demo dataset.
 
     Parameters
@@ -66,17 +66,19 @@ def fetch_langloc_dataset(data_dir=None, verbose=1):
     downloaded_files: list of string
         Absolute paths of downloaded files on disk
     """
-    url = 'https://osf.io/npgey/download'
+    url = 'https://osf.io/nh987/download'
     dataset_name = 'fMRI-language-localizer-demo-dataset'
-    main_folder = ''
+    main_folder = 'fMRI-language-localizer-demo-dataset'
 
     data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
                                 verbose=verbose)
     # The files_spec needed for _fetch_files
-    files_spec = [('langloc.zip', url, {'uncompress': 'langloc.zip'})]
+    files_spec = [(main_folder + '.zip', url, {'move': main_folder + '.zip'})]
     if not os.path.exists(os.path.join(data_dir, main_folder)):
         downloaded_files = _fetch_files(data_dir, files_spec, resume=True,
                                         verbose=verbose)
+        _uncompress_file(downloaded_files[0])
+
     main_path = os.path.join(data_dir, main_folder)
     file_list = [os.path.join(path, f) for
                  path, dirs, files in os.walk(main_path) for f in files]
