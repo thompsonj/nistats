@@ -82,7 +82,7 @@ def fetch_language_localizer_demo_dataset(data_dir=None, verbose=1):
     main_path = os.path.join(data_dir, main_folder)
     file_list = [os.path.join(path, f) for
                  path, dirs, files in os.walk(main_path) for f in files]
-    return os.path.join(data_dir, main_folder), sorted(file_list)
+    return data_dir, sorted(file_list)
 
 # should be deprecated, even deleted, when the examples are adapted to use fetch_langloc_dataset
 def fetch_bids_langloc_dataset(data_dir=None, verbose=1):
