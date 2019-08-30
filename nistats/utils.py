@@ -47,7 +47,7 @@ def _read_events_table(table):
         raise ValueError('table path %s could not be loaded' % table)
     if loaded.empty:
         try:
-            loaded = pd.read_table(table)
+            loaded = pd.read_csv(table, sep='\t')
         except:
             raise ValueError('table path %s could not be loaded' % table)
     return loaded
