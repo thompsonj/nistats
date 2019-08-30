@@ -74,7 +74,7 @@ def fetch_language_localizer_demo_dataset(data_dir=None, verbose=1):
                                 verbose=verbose)
     # The files_spec needed for _fetch_files
     files_spec = [(main_folder + '.zip', url, {'move': main_folder + '.zip'})]
-    if not os.path.exists(os.path.join(data_dir, main_folder)):
+    if not os.path.exists(data_dir):
         downloaded_files = _fetch_files(data_dir, files_spec, resume=True,
                                         verbose=verbose)
         _uncompress_file(downloaded_files[0])
@@ -373,18 +373,18 @@ def _download_spm_auditory_data(data_dir, subject_dir, subject_id):
 def _prepare_downloaded_spm_auditory_data(subject_dir):
     """ Uncompresses downloaded spm_auditory dataset and organizes
     the data into apprpriate directories.
-    
+
     Parameters
     ----------
     subject_dir: string
         Path to subject's data directory.
-        
+
     Returns
     -------
     _subject_data: skl.Bunch object
         Scikit-Learn Bunch object containing data of a single subject
          from the SPM Auditory dataset.
-    
+
     """
     subject_data = {}
     for file_name in SPM_AUDITORY_DATA_FILES:
@@ -420,8 +420,8 @@ def _prepare_downloaded_spm_auditory_data(subject_dir):
         nib.save(vol, _subject_data['anat'])
 
     return Bunch(**_subject_data)
-    
-    
+
+
 def _make_path_events_file_spm_auditory_data(spm_auditory_data):
     """
     Accepts data for spm_auditory dataset as Bunch
@@ -429,7 +429,7 @@ def _make_path_events_file_spm_auditory_data(spm_auditory_data):
     Parameters
     ----------
     spm_auditory_data: Bunch
-    
+
     Returns
     -------
     events_filepath: string
@@ -445,16 +445,16 @@ def _make_events_file_spm_auditory_data(events_filepath):
     """
     Accepts destination filepath including filename and
     creates the events.tsv file for the spm_auditory dataset.
-    
+
     Parameters
     ----------
     events_filepath: string
         The path where the events file will be created;
-    
+
     Returns
     -------
     None
-    
+
     """
     tr = 7.
     epoch_duration = 6 * tr  # duration in seconds
@@ -466,7 +466,7 @@ def _make_events_file_spm_auditory_data(events_filepath):
             {'onset': onset, 'duration': duration, 'trial_type': conditions})
     events.to_csv(events_filepath, sep='\t', index=False,
                        columns=['onset', 'duration', 'trial_type'])
-    
+
 
 def fetch_spm_auditory(data_dir=None, data_name='spm_auditory',
                        subject_id='sub001', verbose=1):
@@ -522,7 +522,7 @@ def _get_func_data_spm_multimodal(subject_dir, session, _subject_data):
         print('Missing %i functional scans for session %i.' % (
             390 - len(session_func), session))
         return None
-    
+
     _subject_data['func%i' % (session)] = session_func
     return _subject_data
 
@@ -534,7 +534,7 @@ def _get_session_trials_spm_multimodal(subject_dir, session, _subject_data):
     if not os.path.isfile(sess_trials):
         print('Missing session file: %s' % sess_trials)
         return None
-    
+
     _subject_data['trials_ses%i' % (session)] = sess_trials
     return _subject_data
 
@@ -544,7 +544,7 @@ def _get_anatomical_data_spm_multimodal(subject_dir, _subject_data):
     if not os.path.isfile(anat):
         print('Missing structural image.')
         return None
-    
+
     _subject_data['anat'] = anat
     return _subject_data
 
@@ -570,13 +570,13 @@ def _glob_spm_multimodal_fmri_data(subject_dir):
             events_filepath = _make_events_filepath_spm_multimodal_fmri(_subject_data, session)
             events.to_csv(events_filepath, sep='\t', index=False)
             _subject_data['events{}'.format(session)] = events_filepath
-        
+
 
     # glob for anat data
     _subject_data = _get_anatomical_data_spm_multimodal(subject_dir, _subject_data)
     if not _subject_data:
         return None
-    
+
     return Bunch(**_subject_data)
 
 
