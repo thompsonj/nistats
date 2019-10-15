@@ -22,28 +22,9 @@ from scipy.io import loadmat
 from scipy.io.matlab.miobase import MatReadError
 from sklearn.datasets.base import Bunch
 
-from nistats.utils import _check_events_file_uses_tab_separators
-
-
 SPM_AUDITORY_DATA_FILES = ["fM00223/fM00223_%03i.img" % index
                            for index in range(4, 100)]
 SPM_AUDITORY_DATA_FILES.append("sM00223/sM00223_002.img")
-
-
-def _check_import_boto3(module_name):
-    """Helper function which checks boto3 is installed or not
-
-    If not installed raises an ImportError with user friendly
-    information.
-    """
-    try:
-        module = __import__(module_name)
-    except ImportError:
-        info = "Please install boto3 to download openneuro datasets."
-        raise ImportError("Module {0} cannot be found. {1} "
-                          .format(module_name, info))
-    return module
-
 
 
 def fetch_language_localizer_demo_dataset(data_dir=None, verbose=1):
@@ -122,14 +103,13 @@ def fetch_bids_langloc_dataset(data_dir=None, verbose=1):
     return os.path.join(data_dir, main_folder), sorted(file_list)
 
 
-def fetch_openneuro_dataset_index(
-        data_dir=None, dataset_version='ds000030_R1.0.4', verbose=1):
-    """Download openneuro bids dataset index
+def fetch_openneuro_dataset_index(data_dir=None,
+                                  dataset_version='ds000030_R1.0.4',
+                                  verbose=1):
+    """ Download a file with OpenNeuro BIDS dataset index.
 
     Downloading the index allows to explore the dataset directories
     to select specific files to download. The index is a sorted list of urls.
-
-    Note: This function requires boto3 to be installed.
 
     Parameters
     ----------
@@ -151,40 +131,24 @@ def fetch_openneuro_dataset_index(
     urls: list of string
         Sorted list of dataset directories
     """
-    from botocore.handlers import disable_signing
-    boto3 = _check_import_boto3("boto3")
-    data_prefix = '{}/{}/uncompressed'.format(
-        dataset_version.split('_')[0], dataset_version)
+    data_prefix = '{}/{}/uncompressed'.format(dataset_version.split('_')[0],
+                                              dataset_version,
+                                              )
     data_dir = _get_dataset_dir(data_prefix, data_dir=data_dir,
                                 verbose=verbose)
 
-    # First we download the url list from the uncompressed dataset version
-    urls_path = os.path.join(data_dir, 'urls.json')
-    urls = []
-    if not os.path.exists(urls_path):
-
-        def get_url(endpoint_url, bucket_name, file_key):
-            return '{}/{}/{}'.format(endpoint_url, bucket_name, file_key)
-
-        resource = boto3.resource('s3')
-        resource.meta.client.meta.events.register('choose-signer.s3.*',
-                                                  disable_signing)
-        bucket = resource.Bucket('openneuro')
-
-        for obj in bucket.objects.filter(Prefix=data_prefix):
-            # get url of files (keys of directories end with '/')
-            if obj.key[-1] != '/':
-                urls.append(
-                    get_url(bucket.meta.client.meta.endpoint_url,
-                            bucket.name, obj.key))
-        urls = sorted(urls)
-
-        with open(urls_path, 'w') as json_file:
-            json.dump(urls, json_file)
-    else:
-        with open(urls_path, 'r') as json_file:
-            urls = json.load(json_file)
-
+    file_url = 'https://osf.io/86xj7/download'
+    final_download_path = os.path.join(data_dir, 'urls.json')
+    downloaded_file_path = _fetch_files(data_dir=data_dir,
+                                        files=[(final_download_path,
+                                                file_url,
+                                                {'move': final_download_path}
+                                                )],
+                                        resume=True
+                                        )
+    urls_path = downloaded_file_path[0]
+    with open(urls_path, 'r') as json_file:
+        urls = json.load(json_file)
     return urls_path, urls
 
 
@@ -251,12 +215,29 @@ def select_from_index(urls, inclusion_filters=[], exclusion_filters=[],
     return urls
 
 
+def patch_openneuro_dataset(file_list):
+    """Add symlinks for files not named according to latest BIDS conventions."""
+    rep = {'_T1w_brainmask': '_desc-brain_mask',
+           '_T1w_preproc': '_desc-preproc_T1w',
+           '_T1w_space-MNI152NLin2009cAsym_brainmask': '_space-MNI152NLin2009cAsym_desc-brain_mask',
+           '_T1w_space-MNI152NLin2009cAsym_class-': '_space-MNI152NLin2009cAsym_label-',
+           '_T1w_space-MNI152NLin2009cAsym_preproc': '_space-MNI152NLin2009cAsym_desc-preproc_T1w',
+           '_bold_confounds': '_desc-confounds_regressors',
+           '_bold_space-MNI152NLin2009cAsym_brainmask':'_space-MNI152NLin2009cAsym_desc-brain_mask',
+           '_bold_space-MNI152NLin2009cAsym_preproc':'_space-MNI152NLin2009cAsym_desc-preproc_bold'}
+    # Create a symlink if a file with the modified filename does not exist
+    for old in rep:
+        for name in file_list:
+            if old in name:
+                if not os.path.exists(name.replace(old, rep[old])):
+                    os.symlink(name, name.replace(old, rep[old]))
+                name = name.replace(old, rep[old])
+
+
 def fetch_openneuro_dataset(
         urls=None, data_dir=None, dataset_version='ds000030_R1.0.4',
         verbose=1):
-    """Download openneuro bids dataset.
-
-    Note: This function requires boto3 to be installed.
+    """Download OpenNeuro BIDS dataset.
 
     Parameters
     ----------
@@ -282,7 +263,6 @@ def fetch_openneuro_dataset(
     downloaded_files: list of string
         Absolute paths of downloaded files on disk
     """
-    boto3 = _check_import_boto3("boto3")
     data_prefix = '{}/{}/uncompressed'.format(
         dataset_version.split('_')[0], dataset_version)
     data_dir = _get_dataset_dir(data_prefix, data_dir=data_dir,
@@ -319,7 +299,8 @@ def fetch_openneuro_dataset(
                 download_attempts -= 1
         if not success:
             raise Exception('multiple failures downloading %s' % file_spec[1])
-
+    patch_openneuro_dataset(downloaded)
+    
     return data_dir, sorted(downloaded)
 
 

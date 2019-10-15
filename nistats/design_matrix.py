@@ -100,8 +100,14 @@ def _cosine_drift(high_pass, frame_times):
     """
     n_frames = len(frame_times)
     n_times = np.arange(n_frames)
-    dt = frame_times[1] - frame_times[0]
-    order = int(np.floor(2 * n_frames * high_pass * dt))
+    dt = (frame_times[-1] - frame_times[0]) / (n_frames - 1)
+    if high_pass * dt >= .5:
+        warn('High-pass filter will span all accessible frequencies '
+             'and saturate the design matrix. '
+             'You may want to reduce the high_pass value.'
+             'The provided value is {0} Hz'.format(high_pass))
+    order = np.minimum(n_frames - 1,
+                       int(np.floor(2 * n_frames * high_pass * dt)))
     cosine_drift = np.zeros((n_frames, order + 1))
     normalizer = np.sqrt(2.0 / n_frames)
 
@@ -187,15 +193,14 @@ def _convolve_regressors(events, hrf_model, frame_times, fir_delays=[0],
 
     fir_delays : array-like of shape (n_onsets,), optional,
         In case of FIR design, yields the array of delays
-        used in the FIR model.
+        used in the FIR model (in scans).
 
     min_onset : float, optional (default: -24),
         Minimal onset relative to frame_times[0] (in seconds) events
         that start before frame_times[0] + min_onset are not considered.
 
-    oversampling: int or None, optional, default:50,
+    oversampling: int optional, default:50,
         Oversampling factor used in temporal convolutions.
-        Should be 1 whenever hrf_model is 'fir'.
 
     Returns
     -------
@@ -215,14 +220,6 @@ def _convolve_regressors(events, hrf_model, frame_times, fir_delays=[0],
     """
     regressor_names = []
     regressor_matrix = None
-    if hrf_model == 'fir':
-        if oversampling not in [1, None]:
-            warn('Forcing oversampling factor to 1 for a finite'
-                 'impulse response hrf model')
-        oversampling = 1
-    elif oversampling is None:
-        oversampling = 50
-
     trial_type, onset, duration, modulation = check_events(events)
     for condition in np.unique(trial_type):
         condition_mask = (trial_type == condition)
@@ -240,39 +237,6 @@ def _convolve_regressors(events, hrf_model, frame_times, fir_delays=[0],
         else:
             regressor_matrix = np.hstack((regressor_matrix, reg))
     return regressor_matrix, regressor_names
-
-
-def _full_rank(X, cmax=1e15):
-    """ Computes the condition number of X and if it is larger than cmax,
-    returns a matrix with a condition number smaller than cmax.
-
-    Parameters
-    ----------
-    X : array of shape(nrows, ncols)
-        input array
-
-    cmax : float, optional (default:1.e-15),
-        tolerance for condition number
-
-    Returns
-    -------
-    X : array of shape(nrows, ncols)
-        output array
-
-    cond : float,
-        actual condition number
-    """
-    from warnings import warn
-    U, s, V = linalg.svd(X, 0)
-    smax, smin = s.max(), s.min()
-    cond = smax / smin
-    if cond < cmax:
-        return X, cond
-
-    warn('Matrix is singular at working precision, regularizing...')
-    lda = (smax - cmax * smin) / (cmax - 1)
-    X = np.dot(U, np.dot(np.diag(s + lda), V))
-    return X, cmax
 
 
 ######################################################################
@@ -330,7 +294,7 @@ def make_first_level_design_matrix(
 
     fir_delays : array of shape(n_onsets) or list, optional,
         In case of FIR design, yields the array of delays used in the FIR
-        model.
+        model (in scans).
 
     add_regs : array of shape(n_frames, n_add_reg), optional
         additional user-supplied regressors, e.g. data driven noise regressors
@@ -344,9 +308,8 @@ def make_first_level_design_matrix(
         Minimal onset relative to frame_times[0] (in seconds)
         events that start before frame_times[0] + min_onset are not considered.
 
-    oversampling: int or None, optional,
+    oversampling: int, optional,
         Oversampling factor used in temporal convolutions.
-        Should be 1 whenever hrf_model is 'fir'.
 
     Returns
     -------
