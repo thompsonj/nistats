@@ -616,9 +616,9 @@ def first_level_models_from_bids(
     img_filters: list of tuples (str, str), optional (default: None)
         Filters are of the form (field, label). Only one filter per field
         allowed. A file that does not match a filter will be discarded.
-        Possible filters are 'acq', 'ce', 'dir', 'rec', 'run', 'echo', and
-        'desc'. Filter examples would be ('desc', 'preproc'), ('dir', 'pa') and
-        ('run', '10').
+        Possible filters are 'acq', 'ce', 'dir', 'rec', 'run', 'echo', 'res',
+        'den', and 'desc'. Filter examples would be ('desc', 'preproc'),
+        ('dir', 'pa') and ('run', '10').
 
     derivatives_folder: str, optional
         derivatives and app folder path containing preprocessed files.
@@ -665,9 +665,9 @@ def first_level_models_from_bids(
                 not isinstance(img_filter[1], str)):
             raise TypeError('filters in img filters must be (str, str), '
                             'instead %s was given' % type(img_filter))
-        if img_filter[0] not in ['acq', 'ce', 'dir', 'rec', 'run', 'echo', 'desc']:
+        if img_filter[0] not in ['acq', 'ce', 'dir', 'rec', 'run', 'echo', 'desc', 'res', 'den']:
             raise ValueError("field %s is not a possible filter. Only "
-                             "'acq', 'ce', 'dir', 'rec', 'run', 'echo', 'desc' "
+                             "'acq', 'ce', 'dir', 'rec', 'run', 'echo', 'desc', 'res', 'den' "
                              "are allowed." % img_filter[0])
 
     # check derivatives folder is present
