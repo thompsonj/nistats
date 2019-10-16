@@ -55,14 +55,16 @@ def fetch_language_localizer_demo_dataset(data_dir=None, verbose=1):
                                 verbose=verbose)
     # The files_spec needed for _fetch_files
     files_spec = [(main_folder + '.zip', url, {'move': main_folder + '.zip'})]
-    if not os.path.exists(data_dir):
+    # Only download if directory is empty
+    # Directory will have been created by the call to _get_dataset_dir above
+    if not os.listdir(data_dir):
         downloaded_files = _fetch_files(data_dir, files_spec, resume=True,
                                         verbose=verbose)
         _uncompress_file(downloaded_files[0])
 
-    main_path = os.path.join(data_dir, main_folder)
+    # main_path = os.path.join(data_dir, main_folder)
     file_list = [os.path.join(path, f) for
-                 path, dirs, files in os.walk(main_path) for f in files]
+                 path, dirs, files in os.walk(data_dir) for f in files]
     return data_dir, sorted(file_list)
 
 # should be deprecated, even deleted, when the examples are adapted to use fetch_langloc_dataset
