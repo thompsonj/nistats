@@ -202,7 +202,7 @@ def _mock_language_localizer_demo_dataset(data_dir):
         file_name = '{}{}events.tsv'.format(subject_dir, filename_prefix)
         file_path = os.path.join(subdir_path, file_name)
         events_file_paths.append(file_path)
-        os.mknod(file_path)
+        with open(file_path, 'w') as f: pass
         subdir_path = os.path.join(data_dir,
                                    dataset_name,
                                    'derivatives',
@@ -218,7 +218,7 @@ def _mock_language_localizer_demo_dataset(data_dir):
             file_name = '{}{}'.format(filename_prefix, filename_suffix_)
             file_path = os.path.join(subdir_path, file_name)
             derivatives_file_paths.append(file_path)
-            os.mknod(file_path)
+            with open(file_path, 'w') as f: pass
     expected_data_dir = os.path.join(data_dir, dataset_name)
     expected_files = []
     expected_files.extend(events_file_paths)
