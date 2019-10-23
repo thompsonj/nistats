@@ -48,10 +48,9 @@ def fetch_language_localizer_demo_dataset(data_dir=None, verbose=1):
         Absolute paths of downloaded files on disk
     """
     url = 'https://osf.io/nh987/download'
-    dataset_name = 'fMRI-language-localizer-demo-dataset'
     main_folder = 'fMRI-language-localizer-demo-dataset'
 
-    data_dir = _get_dataset_dir(dataset_name, data_dir=data_dir,
+    data_dir = _get_dataset_dir(main_folder, data_dir=data_dir,
                                 verbose=verbose)
     # The files_spec needed for _fetch_files
     files_spec = [(main_folder + '.zip', url, {'move': main_folder + '.zip'})]
@@ -62,7 +61,6 @@ def fetch_language_localizer_demo_dataset(data_dir=None, verbose=1):
                                         verbose=verbose)
         _uncompress_file(downloaded_files[0])
 
-    # main_path = os.path.join(data_dir, main_folder)
     file_list = [os.path.join(path, f) for
                  path, dirs, files in os.walk(data_dir) for f in files]
     return data_dir, sorted(file_list)
