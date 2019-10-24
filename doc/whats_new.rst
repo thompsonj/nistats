@@ -10,7 +10,7 @@ New
 ---
 
 * Use :func:`nistats.reporting.make_glm_report` to easily generate HTML reports from fitted first and second level models and contrasts.
-* New dataset fetcher, :func:`nistats.datasets.fMRI_language_localizer_demo_dataset` , BIDS 1.2 compatible.
+* New dataset fetcher, :func:`nistats.datasets.fetch_language_localizer_demo_dataset` , BIDS 1.2 compatible.
 
 Changes
 -------
