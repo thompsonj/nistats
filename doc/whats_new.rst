@@ -23,7 +23,7 @@ Fixes
 * Removed Python 2 deprecation warning for Python 3 installations.
 * fixed effect contrasts now average effect sizes across runs rather than
   summing them.
-* :func:`nistats.first_level_order.first_level_models_from_bids` uses correct BIDS v1.2 conventions.
+* :func:`nistats.first_level_model.first_level_models_from_bids` uses correct BIDS v1.2 conventions.
 
 Contributors
 ------------
